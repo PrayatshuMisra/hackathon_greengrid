@@ -41,7 +41,6 @@ export default function ChallengesAdmin() {
     try {
       setLoading(true)
 
-      // Updated query to use the correct table name and relationship
       const query = supabase
         .from("challenges")
         .select(`

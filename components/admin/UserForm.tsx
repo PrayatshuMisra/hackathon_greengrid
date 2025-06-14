@@ -56,7 +56,6 @@ export function UserForm({ user, onSubmit }) {
     try {
       setLoading(true)
 
-      // Upload avatar if selected
       if (avatarFile) {
         const fileName = `avatar-${Date.now()}-${avatarFile.name}`
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -65,7 +64,6 @@ export function UserForm({ user, onSubmit }) {
 
         if (uploadError) throw uploadError
 
-        // Get public URL
         const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(fileName)
 
         data.avatar_url = publicUrlData.publicUrl

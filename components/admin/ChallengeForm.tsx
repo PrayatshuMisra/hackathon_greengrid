@@ -45,7 +45,6 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        // Updated to use the correct table name
         const { data, error } = await supabase.from("challenge_categories").select("*").order("name")
 
         if (error) throw error
@@ -75,7 +74,6 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
     try {
       setLoading(true)
 
-      // Upload image if selected
       if (imageFile) {
         const fileName = `challenge-${Date.now()}-${imageFile.name}`
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -84,7 +82,6 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
 
         if (uploadError) throw uploadError
 
-        // Get public URL
         const { data: publicUrlData } = supabase.storage.from("challenge-images").getPublicUrl(fileName)
 
         data.image_url = publicUrlData.publicUrl

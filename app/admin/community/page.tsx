@@ -46,7 +46,6 @@ export default function CommunityAdmin() {
     try {
       setLoading(true)
 
-      // Updated queries to use the correct table names and relationships
       const [
         { data: postsData, error: postsError },
         { data: commentsData, error: commentsError },

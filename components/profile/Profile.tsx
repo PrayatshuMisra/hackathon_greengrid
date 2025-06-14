@@ -87,18 +87,14 @@ export function Profile() {
     if (!file) return
 
     try {
-      // In a real app, this would upload the file to storage
-      // For now, we'll simulate success with a local URL
 
       const imageUrl = URL.createObjectURL(file)
 
-      // Update profile data
       setProfileData((prev) => ({
         ...prev,
         avatar: imageUrl,
       }))
 
-      // Show success message
       toast({
         title: "Avatar Updated",
         description: "Your profile picture has been updated successfully.",
@@ -118,13 +114,6 @@ export function Profile() {
     setLoading(true)
 
     try {
-      // In a real app, this would update the user profile in the database
-      // For now, we'll simulate success
-
-      // Update user context
-      // This would typically be done through a context update function
-
-      // Show success message
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",

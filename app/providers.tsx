@@ -46,7 +46,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get current user session
     const getUser = async () => {
       setLoading(true)
       try {
@@ -55,7 +54,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         } = await supabase.auth.getSession()
 
         if (session?.user) {
-          // Fetch user profile from database
           const { data: profile, error } = await supabase
             .from("profiles")
             .select("*")
@@ -84,7 +82,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
               rank: profile.rank || 0,
             })
           } else {
-            // If profile doesn't exist yet, create one
             const userData = {
               id: session.user.id,
               email: session.user.email || "",
@@ -124,7 +121,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     getUser()
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {

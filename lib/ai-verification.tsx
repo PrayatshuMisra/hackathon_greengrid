@@ -18,7 +18,7 @@ export const useAI = () => useContext(AIContext)
 
 export function AIProvider({ children }: { children: React.ReactNode }) {
   const verifyImage = async (file: File, challengeType: string) => {
-    // Simulate AI image verification
+    
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
     const verificationResults = {
@@ -74,7 +74,7 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
   }
 
   const extractTextFromImage = async (file: File, documentType: string) => {
-    // Simulate OCR text extraction
+  
     await new Promise((resolve) => setTimeout(resolve, 3000))
 
     const ocrResults = {

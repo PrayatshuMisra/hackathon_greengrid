@@ -30,7 +30,6 @@ export function QuickActions() {
   const { toast } = useToast()
   const router = useRouter()
 
-  // Simulated challenges data - in a real app, fetch from Supabase
   const activeChallenges = [
     { id: "1", title: "Plastic-Free Week Challenge", type: "plastic-free" },
     { id: "2", title: "Bike to Work/School", type: "bike-commute" },
@@ -43,8 +42,6 @@ export function QuickActions() {
     if (!selectedChallenge) return
 
     try {
-      // In a real app, this would insert into the user_challenges table
-      // For now, we'll simulate success
 
       toast({
         title: "Thank you for joining!",
@@ -66,8 +63,6 @@ export function QuickActions() {
   const handleVerificationComplete = async (result: any) => {
     if (result.success) {
       try {
-        // In a real app, this would update the challenge progress
-        // For now, we'll simulate success
 
         toast({
           title: "Verification Successful!",
@@ -90,8 +85,6 @@ export function QuickActions() {
     if (!inviteEmail) return
 
     try {
-      // In a real app, this would send an invitation
-      // For now, we'll simulate success
 
       toast({
         title: "Invitation Sent!",

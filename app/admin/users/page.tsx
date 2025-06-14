@@ -40,7 +40,6 @@ export default function UsersAdmin() {
     try {
       setLoading(true)
 
-      // Changed from "users" to "profiles" to match the actual table name
       const query = supabase
         .from("profiles")
         .select("*")
@@ -74,7 +73,6 @@ export default function UsersAdmin() {
 
   const handleUpdateUser = async (formData) => {
     try {
-      // Changed from "users" to "profiles"
       const { data, error } = await supabase.from("profiles").update(formData).eq("id", selectedUser.id).select()
 
       if (error) throw error
@@ -98,7 +96,6 @@ export default function UsersAdmin() {
 
   const handleDeleteUser = async () => {
     try {
-      // Changed from "users" to "profiles"
       const { error } = await supabase.from("profiles").delete().eq("id", selectedUser.id)
 
       if (error) throw error
@@ -124,7 +121,6 @@ export default function UsersAdmin() {
     try {
       const newStatus = user.status === "active" ? "suspended" : "active"
 
-      // Changed from "users" to "profiles"
       const { data, error } = await supabase.from("profiles").update({ status: newStatus }).eq("id", user.id).select()
 
       if (error) throw error

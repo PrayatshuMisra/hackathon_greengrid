@@ -20,7 +20,6 @@ export default function SettingsPage() {
     try {
       setLoading(true)
 
-      // Simulate saving settings
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
       toast({

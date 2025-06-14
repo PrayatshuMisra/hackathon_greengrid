@@ -41,16 +41,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const { supabase } = useApp()
 
   useEffect(() => {
-    // Simulate real-time updates
     const interval = setInterval(() => {
-      // Randomly update team points
       setTeams((prev) =>
         prev.map((team) => ({
           ...team,
           points: team.points + Math.floor(Math.random() * 10),
         })),
       )
-    }, 30000) // Update every 30 seconds
+    }, 30000) 
 
     return () => clearInterval(interval)
   }, [])

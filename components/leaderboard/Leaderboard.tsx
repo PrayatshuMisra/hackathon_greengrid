@@ -10,7 +10,6 @@ export function Leaderboard() {
   const [leaderboardScope, setLeaderboardScope] = useState("global")
   const { teams } = useRealtime()
 
-  // Simulated leaderboard data
   const teamsData = [
     { id: 1, name: "EcoWarriors Delhi", members: 24, points: 4580, rank: 1, city: "Delhi" },
     { id: 2, name: "Green Guardians Mumbai", members: 31, points: 4320, rank: 2, city: "Mumbai" },

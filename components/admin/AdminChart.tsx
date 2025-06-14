@@ -11,13 +11,11 @@ import {
   Legend,
 } from "chart.js"
 
-// Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 export function AdminChart({ data }) {
-  // Process data for chart
+  
   const processChartData = () => {
-    // Group by date and count activities
     const last7Days = [...Array(7)]
       .map((_, i) => {
         const d = new Date()
@@ -35,7 +33,6 @@ export function AdminChart({ data }) {
       return acc
     }, {})
 
-    // Count activities by type and date
     data.forEach((item) => {
       const date = new Date(item.created_at).toISOString().split("T")[0]
       if (activityCounts[date]) {

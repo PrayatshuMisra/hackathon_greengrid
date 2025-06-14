@@ -30,12 +30,10 @@ export default function SignupPage() {
     setError(null)
 
     try {
-      // Validate inputs
       if (password.length < 6) {
         throw new Error("Password must be at least 6 characters long")
       }
 
-      // Sign up with email and password
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -53,7 +51,6 @@ export default function SignupPage() {
         throw authError
       }
 
-      // Create profile entry
       if (authData.user) {
         const { error: profileError } = await supabase.from("profiles").insert({
           id: authData.user.id,
@@ -66,11 +63,9 @@ export default function SignupPage() {
 
         if (profileError) {
           console.error("Profile creation error:", profileError)
-          // Continue with signup even if profile creation fails
-          // We'll handle this case separately
+
         }
 
-        // Show success message
         toast({
           title: "Account created successfully!",
           description: "Please check your email to confirm your account.",

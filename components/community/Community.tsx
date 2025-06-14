@@ -91,16 +91,14 @@ export function Community() {
 
   const handleLike = (postId: number) => {
     if (likedPosts.includes(postId)) {
-      // Unlike
+     
       setLikedPosts((prev) => prev.filter((id) => id !== postId))
 
-      // Update post likes
       setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes - 1 } : post)))
     } else {
-      // Like
+    
       setLikedPosts((prev) => [...prev, postId])
 
-      // Update post likes
       setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post)))
     }
   }
@@ -108,22 +106,17 @@ export function Community() {
   const handleComment = (postId: number) => {
     if (!commentText.trim()) return
 
-    // Add comment
     setComments((prev) => ({
       ...prev,
       [postId]: [...(prev[postId] || []), commentText],
     }))
 
-    // Update post replies
     setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, replies: post.replies + 1 } : post)))
 
-    // Clear comment text
     setCommentText("")
   }
 
   const handleShare = (postId: number) => {
-    // In a real app, this would open a share dialog
-    // For now, we'll simulate copying a link to clipboard
 
     const shareLink = `${window.location.origin}/community/post/${postId}`
     navigator.clipboard.writeText(shareLink)
@@ -138,7 +131,6 @@ export function Community() {
   const handleCreatePost = () => {
     if (!postContent.trim()) return
 
-    // Create new post
     const newPost = {
       id: forumPosts.length + 1,
       author: "You",
@@ -151,15 +143,12 @@ export function Community() {
       time: "Just now",
     }
 
-    // Add post to list
     setForumPosts((prev) => [newPost, ...prev])
 
-    // Close dialog and reset form
     setNewPostOpen(false)
     setPostContent("")
     setPostTitle("")
 
-    // Show success message
     toast({
       title: "Post Created!",
       description: "Your post has been published successfully.",

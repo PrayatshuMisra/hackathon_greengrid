@@ -102,13 +102,8 @@ export function TeamManagement() {
     setLoading(true)
 
     try {
-      // Generate a unique invite code
       const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-      // In a real app, this would create a team in the database
-      // For now, we'll simulate success
-
-      // Create a new team object
       const newTeam = {
         id: Math.random().toString(),
         name: teamName,
@@ -130,14 +125,11 @@ export function TeamManagement() {
         invite_code: inviteCode,
       }
 
-      // Generate invite link
       const inviteLink = `${window.location.origin}/join-team/${newTeam.id}?code=${inviteCode}`
       setInviteLink(inviteLink)
 
-      // Update state
       setCurrentTeam(newTeam)
 
-      // Show success message
       toast({
         title: "Team Created!",
         description: `Your team "${teamName}" has been created successfully.`,
@@ -162,8 +154,6 @@ export function TeamManagement() {
     if (!inviteEmail) return
 
     try {
-      // In a real app, this would send an email invitation
-      // For now, we'll simulate success
 
       toast({
         title: "Invitation Sent!",
@@ -196,8 +186,6 @@ export function TeamManagement() {
 
   const handleRemoveMember = (memberId: string) => {
     try {
-      // In a real app, this would remove the member from the team
-      // For now, we'll simulate success
 
       toast({
         title: "Member Removed",
@@ -215,8 +203,6 @@ export function TeamManagement() {
 
   const handlePromoteMember = (memberId: string) => {
     try {
-      // In a real app, this would promote the member to admin
-      // For now, we'll simulate success
 
       toast({
         title: "Member Promoted",
@@ -243,8 +229,6 @@ export function TeamManagement() {
     }
 
     try {
-      // In a real app, this would update the team in the database
-      // For now, we'll update the local state
 
       setCurrentTeam((prev: any) => ({
         ...prev,
@@ -253,7 +237,6 @@ export function TeamManagement() {
         city: teamCity,
       }))
 
-      // Show success message
       toast({
         title: "Team Updated",
         description: "Your team settings have been updated successfully.",
@@ -282,8 +265,6 @@ export function TeamManagement() {
     }
 
     try {
-      // In a real app, this would verify the code and add the user to the team
-      // For now, we'll simulate success
 
       toast({
         title: "Team Joined",
@@ -291,8 +272,6 @@ export function TeamManagement() {
         variant: "success",
       })
 
-      // In a real app, we would fetch the team details and update the state
-      // For now, we'll just show a success message
     } catch (error: any) {
       console.error("Join team error:", error)
       toast({
@@ -306,8 +285,6 @@ export function TeamManagement() {
   const handleLeaveTeam = () => {
     if (confirm("Are you sure you want to leave this team?")) {
       try {
-        // In a real app, this would remove the user from the team
-        // For now, we'll simulate success
 
         toast({
           title: "Team Left",

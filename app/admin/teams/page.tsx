@@ -39,7 +39,6 @@ export default function TeamsAdmin() {
     try {
       setLoading(true)
 
-      // Modified query to avoid the recursive policy issue
       const { data: teamsData, error: teamsError } = await supabase
         .from("teams")
         .select("*")
@@ -47,7 +46,6 @@ export default function TeamsAdmin() {
 
       if (teamsError) throw teamsError
 
-      // Fetch member counts separately to avoid recursion
       const teamIds = teamsData.map((team) => team.id)
       const { data: memberCounts, error: memberCountsError } = await supabase
         .from("team_members")
@@ -57,13 +55,11 @@ export default function TeamsAdmin() {
 
       if (memberCountsError) throw memberCountsError
 
-      // Create a map of team_id to member count
       const countMap = {}
       memberCounts?.forEach((item) => {
         countMap[item.team_id] = Number.parseInt(item.count)
       })
 
-      // Combine the data
       const processedTeams = teamsData.map((team) => ({
         ...team,
         member_count: countMap[team.id] || 0,

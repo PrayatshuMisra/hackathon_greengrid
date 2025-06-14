@@ -26,7 +26,6 @@ export function EcoWallet() {
 
   const redeemReward = async (reward: any) => {
     try {
-      // Check if user has enough points
       if (userStats.totalPoints < reward.cost) {
         toast({
           title: "Insufficient Points",
@@ -36,26 +35,19 @@ export function EcoWallet() {
         return
       }
 
-      // In a real app, this would create a redemption record in the database
-      // For now, we'll simulate success
-
-      // Generate a redemption code
       const redemptionCode = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-      // Update user points
       setUserStats((prev) => ({
         ...prev,
         totalPoints: prev.totalPoints - reward.cost,
       }))
 
-      // Show success message
       toast({
         title: "Reward Redeemed!",
         description: `You've successfully redeemed ${reward.name}. Your redemption code is ${redemptionCode}.`,
         variant: "success",
       })
 
-      // In a real app, we would update the user's rewards list
     } catch (error: any) {
       console.error("Redemption error:", error)
       toast({

@@ -39,7 +39,6 @@ export default function VerificationsAdmin() {
     try {
       setLoading(true)
 
-      // Updated query to use the correct table names and relationships
       const { data, error } = await supabase
         .from("challenge_submissions")
         .select(`

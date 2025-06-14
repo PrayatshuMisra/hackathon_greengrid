@@ -124,9 +124,9 @@ export function Challenges() {
 
   const handleVerificationComplete = (result: any) => {
     console.log("Verification result:", result)
-    // Handle verification result
+    
     if (result.success) {
-      // Update challenge progress, award points, etc.
+    
     }
   }
 
@@ -141,10 +141,6 @@ export function Challenges() {
     setJoiningChallenge(true)
 
     try {
-      // In a real app, this would insert into the user_challenges table
-      // For now, we'll simulate success with a state update
-
-      // Update the challenges state to mark this challenge as joined
       const updatedChallenges = challenges.map((challenge) =>
         challenge.id === selectedChallenge.id
           ? { ...challenge, joined: true, participants: challenge.participants + 1 }
@@ -153,10 +149,8 @@ export function Challenges() {
 
       setChallenges(updatedChallenges)
 
-      // Close the dialog
       setJoinDialogOpen(false)
 
-      // Show success message
       toast({
         title: "Thank you for joining!",
         description: `You've successfully joined the ${selectedChallenge.title}`,

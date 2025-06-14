@@ -27,7 +27,6 @@ export default function LoginPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    // Set demo credentials after hydration
     setEmail("demo@greengrid.com")
     setPassword("demo123")
     setMounted(true)

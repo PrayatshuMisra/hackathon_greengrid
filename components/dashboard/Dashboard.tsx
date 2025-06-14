@@ -62,7 +62,6 @@ export function Dashboard() {
       if (!user?.id) return
 
       try {
-        // Fetch user dashboard stats
         const { data, error } = await supabase.from("user_dashboard_stats").select("*").eq("user_id", user.id).single()
 
         if (error && error.code !== "PGRST116") {
@@ -78,12 +77,11 @@ export function Dashboard() {
             waterSaved: data.water_saved || 0,
             plasticAvoided: data.plastic_avoided || 0,
             treesPlanted: data.trees_planted || 0,
-            weeklyProgress: 75, // This would be calculated based on weekly goals
+            weeklyProgress: 75, 
             level: data.level || 1,
             levelTitle: getLevelTitle(data.level || 1),
           })
         } else {
-          // Fallback to user profile data
           const { data: profile } = await supabase
             .from("profiles")
             .select("total_points, level, rank")
@@ -150,20 +148,13 @@ export function Dashboard() {
   const handleVerificationComplete = async (result: any) => {
     if (result.success) {
       try {
-        // In a real app, this would update the challenge progress in the database
-        // For now, we'll simulate success with a state update
-
-        // Update the challenge progress in the UI
         const updatedChallenges = activeChallenges.map((challenge) =>
           challenge.id === selectedChallenge.id
             ? { ...challenge, progress: Math.min(100, challenge.progress + 20) }
             : challenge,
         )
-
-        // Update state (in a real app, this would be persisted to the database)
         setActiveChallenges(updatedChallenges)
 
-        // Award points if challenge is completed
         if (updatedChallenges.find((c) => c.id === selectedChallenge.id)?.progress === 100) {
           setUserStats((prev) => ({
             ...prev,

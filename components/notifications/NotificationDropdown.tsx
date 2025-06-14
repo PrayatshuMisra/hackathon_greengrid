@@ -35,7 +35,6 @@ export function NotificationDropdown() {
   useEffect(() => {
     if (!user?.id) return
 
-    // Fetch notifications
     const fetchNotifications = async () => {
       setLoading(true)
       try {
@@ -59,7 +58,6 @@ export function NotificationDropdown() {
 
     fetchNotifications()
 
-    // Subscribe to new notifications
     const channel = supabase
       .channel(`notifications:${user.id}`)
       .on(
@@ -75,7 +73,6 @@ export function NotificationDropdown() {
           setNotifications((prev) => [newNotification, ...prev])
           setUnreadCount((prev) => prev + 1)
 
-          // Show toast for new notification
           toast({
             title: newNotification.title,
             description: newNotification.message,

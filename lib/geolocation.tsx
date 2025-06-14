@@ -26,7 +26,6 @@ export function GeolocationProvider({ children }: { children: React.ReactNode })
   const [localChallenges, setLocalChallenges] = useState([])
 
   useEffect(() => {
-    // Get user's location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -34,13 +33,13 @@ export function GeolocationProvider({ children }: { children: React.ReactNode })
           setLocation({
             lat: latitude,
             lng: longitude,
-            city: "Delhi", // This would be determined by reverse geocoding
+            city: "Delhi", 
           })
           getLocationBasedContent(latitude, longitude)
         },
         (error) => {
           console.error("Geolocation error:", error)
-          // Fallback to default location (Delhi)
+        
           setLocation({ lat: 28.6139, lng: 77.209, city: "Delhi" })
         },
       )
@@ -48,7 +47,7 @@ export function GeolocationProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const getLocationBasedContent = (lat: number, lng: number) => {
-    // Simulate location-based content
+  
     const mockEvents = [
       {
         id: 1,
@@ -73,7 +72,7 @@ export function GeolocationProvider({ children }: { children: React.ReactNode })
   }
 
   const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-    const R = 6371 // Earth's radius in km
+    const R = 6371
     const dLat = ((lat2 - lat1) * Math.PI) / 180
     const dLng = ((lng2 - lng1) * Math.PI) / 180
     const a =

@@ -25,7 +25,6 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
     setFile(selectedFile)
     setVerificationResult(null)
 
-    // Create preview
     const reader = new FileReader()
     reader.onload = (e) => {
       setPreview(e.target?.result as string)
@@ -42,10 +41,10 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
       let result
 
       if (challengeType === "energy-bill" || challengeType === "water-bill") {
-        // Use OCR for bill verification
+    
         result = await extractTextFromImage(file, challengeType)
       } else {
-        // Use image recognition for other challenges
+       
         result = await verifyImage(file, challengeType)
       }
 

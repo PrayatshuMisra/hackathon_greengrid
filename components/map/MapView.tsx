@@ -18,7 +18,6 @@ export function MapView() {
   const { location, nearbyEvents, localChallenges } = useGeolocation()
   const { user } = useApp()
 
-  // Get user's current location
   useEffect(() => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser")
@@ -37,7 +36,6 @@ export function MapView() {
     const errorHandler = () => {
       setError("Unable to retrieve your location")
       setIsLoading(false)
-      // Fallback to Delhi coordinates if location access is denied
       setMapCenter({ lat: 28.6139, lng: 77.209 })
     }
 
@@ -45,7 +43,6 @@ export function MapView() {
     navigator.geolocation.getCurrentPosition(successHandler, errorHandler)
   }, [])
 
-  // Center map on user's location
   const handleCenterOnUser = () => {
     if (userLocation) {
       setMapCenter(userLocation)
@@ -54,9 +51,8 @@ export function MapView() {
     }
   }
 
-  // Calculate distance between two points in km
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371 // Radius of the earth in km
+    const R = 6371 
     const dLat = (lat2 - lat1) * (Math.PI / 180)
     const dLon = (lon2 - lon1) * (Math.PI / 180)
     const a =
@@ -66,7 +62,6 @@ export function MapView() {
     return (R * c).toFixed(1) + " km"
   }
 
-  // Add distance to each item based on user's location
   const enhanceWithDistance = (items: any[]) => {
     if (!mapCenter) return items
     
@@ -81,7 +76,6 @@ export function MapView() {
     }))
   }
 
-  // Simulated map data with dynamic distances
   const mapData = {
     challenges: enhanceWithDistance([
       {
