@@ -26,27 +26,18 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
     setVerificationResult(null)
 
     const reader = new FileReader()
-    reader.onload = (e) => {
-      setPreview(e.target?.result as string)
-    }
+    reader.onload = (e) => setPreview(e.target?.result as string)
     reader.readAsDataURL(selectedFile)
   }
 
   const handleVerification = async () => {
     if (!file) return
-
     setIsVerifying(true)
 
     try {
-      let result
-
-      if (challengeType === "energy-bill" || challengeType === "water-bill") {
-    
-        result = await extractTextFromImage(file, challengeType)
-      } else {
-       
-        result = await verifyImage(file, challengeType)
-      }
+      const result = challengeType === "energy-bill" || challengeType === "water-bill"
+        ? await extractTextFromImage(file, challengeType)
+        : await verifyImage(file, challengeType)
 
       setVerificationResult(result)
       onVerificationComplete(result)
@@ -83,8 +74,9 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
         </CardTitle>
         <CardDescription>{getChallengeInstructions()}</CardDescription>
       </CardHeader>
+
       <CardContent className="space-y-6">
-        {/* File Upload Area */}
+        {/* File Upload */}
         <div className="space-y-4">
           <div
             className="border-2 border-dashed border-green-300 rounded-lg p-8 text-center cursor-pointer hover:border-green-400 transition-colors"
@@ -92,28 +84,21 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
           >
             {preview ? (
               <div className="space-y-4">
-                <img
-                  src={preview || "/placeholder.svg"}
-                  alt="Preview"
-                  className="max-h-64 mx-auto rounded-lg shadow-md"
-                />
+                <img src={preview} alt="Preview" className="max-h-64 mx-auto rounded-lg shadow-md" />
                 <p className="text-sm text-gray-600">Click to change image</p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex justify-center">
-                  {challengeType.includes("bill") ? (
-                    <FileText className="h-12 w-12 text-green-500" />
-                  ) : (
-                    <Camera className="h-12 w-12 text-green-500" />
-                  )}
+                  {challengeType.includes("bill")
+                    ? <FileText className="h-12 w-12 text-green-500" />
+                    : <Camera className="h-12 w-12 text-green-500" />
+                  }
                 </div>
-                <div>
-                  <p className="text-lg font-medium text-gray-700">
-                    {challengeType.includes("bill") ? "Upload your bill" : "Take or upload a photo"}
-                  </p>
-                  <p className="text-sm text-gray-500">Drag and drop or click to browse</p>
-                </div>
+                <p className="text-lg font-medium text-gray-700">
+                  {challengeType.includes("bill") ? "Upload your bill" : "Take or upload a photo"}
+                </p>
+                <p className="text-sm text-gray-500">Drag and drop or click to browse</p>
               </div>
             )}
           </div>
@@ -123,36 +108,18 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={(e) => {
-              const selectedFile = e.target.files?.[0]
-              if (selectedFile) handleFileSelect(selectedFile)
-            }}
+            onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
           />
         </div>
 
-        {/* Verification Button */}
+        {/* Button */}
         {file && !verificationResult && (
-          <Button
-            onClick={handleVerification}
-            disabled={isVerifying}
-            className="w-full bg-green-600 hover:bg-green-700"
-            size="lg"
-          >
-            {isVerifying ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Verifying with AI...
-              </>
-            ) : (
-              <>
-                <Zap className="h-4 w-4 mr-2" />
-                Verify with AI
-              </>
-            )}
+          <Button onClick={handleVerification} disabled={isVerifying} className="w-full bg-green-600 hover:bg-green-700" size="lg">
+            {isVerifying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying with AI...</> : <><Zap className="h-4 w-4 mr-2" />Verify with AI</>}
           </Button>
         )}
 
-        {/* Verification Progress */}
+        {/* Progress */}
         {isVerifying && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -163,18 +130,12 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
           </div>
         )}
 
-        {/* Verification Result */}
+        {/* Result */}
         {verificationResult && (
-          <Card
-            className={`${verificationResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}
-          >
+          <Card className={verificationResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
             <CardContent className="p-4">
               <div className="flex items-start space-x-3">
-                {verificationResult.success ? (
-                  <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" />
-                ) : (
-                  <XCircle className="h-6 w-6 text-red-600 mt-0.5" />
-                )}
+                {verificationResult.success ? <CheckCircle className="h-6 w-6 text-green-600 mt-0.5" /> : <XCircle className="h-6 w-6 text-red-600 mt-0.5" />}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className={`font-semibold ${verificationResult.success ? "text-green-800" : "text-red-800"}`}>
@@ -187,7 +148,6 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
                   <p className={`text-sm ${verificationResult.success ? "text-green-700" : "text-red-700"}`}>
                     {verificationResult.message}
                   </p>
-
                   {verificationResult.details && (
                     <div className="mt-3 space-y-1">
                       {Object.entries(verificationResult.details).map(([key, value]) => (
@@ -203,8 +163,7 @@ export function AIVerification({ challengeType, onVerificationComplete }: AIVeri
             </CardContent>
           </Card>
         )}
-
-        {/* AI Features Info */}
+         {/* AI Features Info */}
         <div className="bg-blue-50 rounded-lg p-4">
           <h4 className="font-medium text-blue-800 mb-2">AI Verification Features:</h4>
           <ul className="text-sm text-blue-700 space-y-1">

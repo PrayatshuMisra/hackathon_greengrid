@@ -20,81 +20,240 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+interface Author {
+  id: string;
+  name: string;
+  avatar_url?: string;
+}
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  author_id: string;
+  author: Author;
+}
+
+interface Comment {
+  id: string;
+  content: string;
+  created_at: string;
+  author_id: string;
+  post_id: string;
+  author: Author;
+  post: {
+    title: string;
+  };
+}
+
+interface Report {
+  id: string;
+  reason: string;
+  details: string;
+  content_type: "post" | "comment";
+  status: "pending" | "resolved";
+  created_at: string;
+  user_id: string;
+  reporter: Author;
+  content_id: string;
+  post?: {
+    id: string;
+    title: string;
+  };
+}
+
 export default function CommunityAdmin() {
-  const [posts, setPosts] = useState([])
-  const [comments, setComments] = useState([])
-  const [reports, setReports] = useState([])
+  const [posts, setPosts] = useState<Post[]>([])
+  const [comments, setComments] = useState<Comment[]>([])
+  const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState("created_at")
   const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedPost, setSelectedPost] = useState(null)
-  const [selectedComment, setSelectedComment] = useState(null)
-  const [selectedReport, setSelectedReport] = useState(null)
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+  const [selectedComment, setSelectedComment] = useState<Comment | null>(null)
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [isViewPostDialogOpen, setIsViewPostDialogOpen] = useState(false)
   const [isDeletePostDialogOpen, setIsDeletePostDialogOpen] = useState(false)
   const [isViewCommentDialogOpen, setIsViewCommentDialogOpen] = useState(false)
   const [isDeleteCommentDialogOpen, setIsDeleteCommentDialogOpen] = useState(false)
   const [isViewReportDialogOpen, setIsViewReportDialogOpen] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchCommunityData()
-  }, [sortField, sortDirection])
+  }, [sortField, sortDirection, retryCount])
 
-  async function fetchCommunityData() {
-    try {
-      setLoading(true)
+async function fetchCommunityData() {
+  try {
+    setLoading(true);
+    setError(null);
 
-      const [
-        { data: postsData, error: postsError },
-        { data: commentsData, error: commentsError },
-        { data: reportsData, error: reportsError },
-      ] = await Promise.all([
-        supabase
-          .from("forum_posts")
-          .select(`
-            *,
-            author:author_id(id, name, avatar_url)
-          `)
-          .order(sortField, { ascending: sortDirection === "asc" }),
-        supabase
-          .from("forum_replies")
-          .select(`
-            *,
-            author:author_id(id, name, avatar_url),
-            post:post_id(title)
-          `)
-          .order(sortField, { ascending: sortDirection === "asc" }),
-        supabase
-          .from("content_reports")
-          .select(`
-            *,
-            reporter:user_id(id, name, avatar_url)
-          `)
-          .order(sortField, { ascending: sortDirection === "asc" }),
-      ])
+    console.log("Starting to fetch community data...");
 
-      if (postsError) throw postsError
-      if (commentsError) throw commentsError
-      if (reportsError) throw reportsError
+    // Fetch data with better error handling
+    const fetchPosts = async () => {
+      const { data, error } = await supabase
+        .from("forum_posts")
+        .select(`
+          *,
+          author:author_id(id, name, avatar_url)
+        `)
+        .order(sortField, { ascending: sortDirection === "asc" });
+      
+      if (error) {
+        console.error("Posts fetch error:", {
+          message: error.message,
+          details: error.details,
+          code: error.code,
+          hint: error.hint
+        });
+        throw error;
+      }
+      return data || [];
+    };
 
-      setPosts(postsData || [])
-      setComments(commentsData || [])
-      setReports(reportsData || [])
-    } catch (error) {
-      console.error("Error fetching community data:", error)
-      toast({
-        title: "Error fetching community data",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+    const fetchComments = async () => {
+      const { data, error } = await supabase
+        .from("forum_replies")
+        .select(`
+          *,
+          author:author_id(id, name, avatar_url),
+          post:post_id(title)
+        `)
+        .order(sortField, { ascending: sortDirection === "asc" });
+      
+      if (error) {
+        console.error("Comments fetch error:", {
+          message: error.message,
+          details: error.details,
+          code: error.code,
+          hint: error.hint
+        });
+        throw error;
+      }
+      return data || [];
+    };
+
+const fetchReports = async () => {
+  try {
+    // Attempt 1: Simple count query
+    const { count: simpleCount, error: countError } = await supabase
+      .from('content_reports')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      console.error("Count query failed:", countError);
+      throw new Error(`Count failed: ${countError.message}`);
     }
-  }
 
-  const handleSort = (field) => {
+    console.log(`Table contains ${simpleCount} reports`);
+
+    // Attempt 2: Minimal data query
+    const { data: minimalData, error: minimalError } = await supabase
+      .from('content_reports')
+      .select('id, reason, created_at')
+      .limit(5);
+
+    if (minimalError) {
+      console.error("Minimal query failed:", minimalError);
+      throw new Error(`Minimal query failed: ${minimalError.message}`);
+    }
+
+    console.log("Minimal data success:", minimalData);
+
+    // Attempt 3: Full query
+    const { data, error } = await supabase
+      .from("content_reports")
+      .select(`
+        *,
+        reporter:user_id(id, name, avatar_url),
+        post:content_id(id, title)
+      `)
+      .order(sortField, { ascending: sortDirection === "asc" });
+
+    if (error) {
+      console.error("Full query failed:", {
+        ...error,
+        stack: new Error().stack
+      });
+      throw error;
+    }
+
+    return data || [];
+  } catch (e) {
+    const error = e as Error;
+    // Capture more error info
+    const errorInfo = {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      // Include additional Supabase error properties if they exist
+      ...(typeof error === 'object' ? error : {})
+    };
+
+    console.error("Complete reports fetch error:", errorInfo);
+    throw new Error(`Reports fetch failed: ${error.message}`);
+  }
+};
+
+    // Execute all queries with individual error handling
+    const [postsData, commentsData, reportsData] = await Promise.all([
+      fetchPosts().catch(e => {
+        console.error("Failed to fetch posts:", e);
+        return [];
+      }),
+      fetchComments().catch(e => {
+        console.error("Failed to fetch comments:", e);
+        return [];
+      }),
+      fetchReports().catch(e => {
+        console.error("Failed to fetch reports:", e);
+        return [];
+      })
+    ]);
+
+    setPosts(postsData);
+    setComments(commentsData);
+    setReports(reportsData);
+
+    console.log("Successfully fetched community data:", {
+      posts: postsData.length,
+      comments: commentsData.length,
+      reports: reportsData.length
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    console.error("Error in fetchCommunityData:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    });
+    
+    setError(error);
+    toast({
+      title: "Error fetching community data",
+      description: error.message || "An unknown error occurred",
+      variant: "destructive",
+      action: (
+        <Button variant="outline" size="sm" onClick={() => setRetryCount(prev => prev + 1)}>
+          Retry
+        </Button>
+      ),
+    });
+  } finally {
+    setLoading(false);
+  }
+}
+
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -104,6 +263,8 @@ export default function CommunityAdmin() {
   }
 
   const handleDeletePost = async () => {
+    if (!selectedPost) return
+    
     try {
       const { error } = await supabase.from("forum_posts").delete().eq("id", selectedPost.id)
 
@@ -116,17 +277,20 @@ export default function CommunityAdmin() {
 
       setIsDeletePostDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error("Error deleting post:", error)
       toast({
         title: "Error deleting post",
-        description: error.message,
+        description: error.message || "Failed to delete post",
         variant: "destructive",
       })
     }
   }
 
   const handleDeleteComment = async () => {
+    if (!selectedComment) return
+    
     try {
       const { error } = await supabase.from("forum_replies").delete().eq("id", selectedComment.id)
 
@@ -139,17 +303,20 @@ export default function CommunityAdmin() {
 
       setIsDeleteCommentDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error("Error deleting comment:", error)
       toast({
         title: "Error deleting comment",
-        description: error.message,
+        description: error.message || "Failed to delete comment",
         variant: "destructive",
       })
     }
   }
 
   const handleResolveReport = async () => {
+    if (!selectedReport) return
+    
     try {
       const { error } = await supabase
         .from("content_reports")
@@ -165,11 +332,12 @@ export default function CommunityAdmin() {
 
       setIsViewReportDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error("Error resolving report:", error)
       toast({
         title: "Error resolving report",
-        description: error.message,
+        description: error.message || "Failed to resolve report",
         variant: "destructive",
       })
     }
@@ -185,7 +353,10 @@ export default function CommunityAdmin() {
     comment.content?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const filteredReports = reports.filter((report) => report.reason?.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredReports = reports.filter((report) => 
+    report.reason?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    report.details?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">
@@ -260,14 +431,27 @@ export default function CommunityAdmin() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      <p className="text-sm text-gray-500 mt-2">Loading posts...</p>
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <p className="text-sm text-gray-500 mt-2">Loading posts...</p>
+                        {error && (
+                          <p className="text-sm text-red-500 mt-1">Error: {error.message}</p>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredPosts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       <p className="text-sm text-gray-500">No posts found</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        onClick={() => setRetryCount(prev => prev + 1)}
+                        className="mt-2"
+                      >
+                        Retry
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -377,14 +561,27 @@ export default function CommunityAdmin() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      <p className="text-sm text-gray-500 mt-2">Loading comments...</p>
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <p className="text-sm text-gray-500 mt-2">Loading comments...</p>
+                        {error && (
+                          <p className="text-sm text-red-500 mt-1">Error: {error.message}</p>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredComments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
                       <p className="text-sm text-gray-500">No comments found</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        onClick={() => setRetryCount(prev => prev + 1)}
+                        className="mt-2"
+                      >
+                        Retry
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -477,7 +674,7 @@ export default function CommunityAdmin() {
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead>Content Type</TableHead>
+                  <TableHead>Content</TableHead>
                   <TableHead>Reported By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>
@@ -497,14 +694,27 @@ export default function CommunityAdmin() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      <p className="text-sm text-gray-500 mt-2">Loading reports...</p>
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <p className="text-sm text-gray-500 mt-2">Loading reports...</p>
+                        {error && (
+                          <p className="text-sm text-red-500 mt-1">Error: {error.message}</p>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredReports.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-24 text-center">
                       <p className="text-sm text-gray-500">No reports found</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        onClick={() => setRetryCount(prev => prev + 1)}
+                        className="mt-2"
+                      >
+                        Retry
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -512,16 +722,11 @@ export default function CommunityAdmin() {
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">{report.reason}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            report.content_type === "post"
-                              ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                              : "bg-purple-100 text-purple-800 hover:bg-purple-100"
-                          }
-                        >
-                          {report.content_type === "post" ? "Post" : "Comment"}
-                        </Badge>
+                        {report.content_type === "post" ? (
+                          report.post?.title || "Unknown post"
+                        ) : (
+                          "Comment"
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center">
@@ -824,6 +1029,31 @@ export default function CommunityAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-500">Additional Comments</p>
                 <p className="mt-1">{selectedReport.details || "No additional comments provided"}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-500">Reported Content</p>
+                <div className="mt-1 p-3 bg-gray-50 rounded-md">
+                  {selectedReport.content_type === "post" ? (
+                    <>
+                      <p className="font-medium">Post: {selectedReport.post?.title || "Unknown post"}</p>
+                      {selectedReport.post?.id && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto"
+                          onClick={() => {
+                            console.log("View post:", selectedReport.post?.id);
+                          }}
+                        >
+                          View Post
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <p>Comment</p>
+                  )}
+                </div>
               </div>
             </div>
           )}

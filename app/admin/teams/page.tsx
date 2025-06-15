@@ -20,7 +20,14 @@ import { useToast } from "@/hooks/use-toast"
 import { TeamForm } from "@/components/admin/TeamForm"
 
 export default function TeamsAdmin() {
-  const [teams, setTeams] = useState([])
+  type Team = {
+  id: string
+  name: string
+  // add other fields like description, etc., if needed
+  member_count: number
+}
+
+  const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState("created_at")
@@ -35,50 +42,64 @@ export default function TeamsAdmin() {
     fetchTeams()
   }, [sortField, sortDirection])
 
-  async function fetchTeams() {
-    try {
-      setLoading(true)
+async function fetchTeams() {
+  try {
+    setLoading(true)
 
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("teams")
-        .select("*")
-        .order(sortField, { ascending: sortDirection === "asc" })
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("*")
+      .order(sortField, { ascending: sortDirection === "asc" })
 
-      if (teamsError) throw teamsError
+    if (teamsError) throw teamsError
 
-      const teamIds = teamsData.map((team) => team.id)
-      const { data: memberCounts, error: memberCountsError } = await supabase
+    // Get team IDs
+    const teamIds = teamsData.map((team) => team.id)
+
+    // Count members for each team (in parallel)
+    const memberCountsPromises = teamIds.map((id) =>
+      supabase
         .from("team_members")
-        .select("team_id, count")
-        .in("team_id", teamIds)
-        .group("team_id")
+        .select("*", { count: "exact", head: true })
+        .eq("team_id", id)
+        .then(({ count }) => ({ team_id: id, count }))
+    )
 
-      if (memberCountsError) throw memberCountsError
+    const memberCountsArray = await Promise.all(memberCountsPromises)
 
-      const countMap = {}
-      memberCounts?.forEach((item) => {
-        countMap[item.team_id] = Number.parseInt(item.count)
-      })
+    // Create count map
+    const countMap: Record<string, number> = {}
+    memberCountsArray.forEach(({ team_id, count }) => {
+      countMap[team_id] = count || 0
+    })
 
-      const processedTeams = teamsData.map((team) => ({
-        ...team,
-        member_count: countMap[team.id] || 0,
-      }))
+    // Merge counts into teams
+    const processedTeams = teamsData.map((team) => ({
+      ...team,
+      member_count: countMap[team.id] || 0,
+    }))
 
-      setTeams(processedTeams || [])
-    } catch (error) {
-      console.error("Error fetching teams:", error)
-      toast({
-        title: "Error fetching teams",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+    setTeams(processedTeams || [])
+  } catch (error) {
+    if (error instanceof Error) {
+    console.error(error.message)
+  } else {
+    console.error("Unknown error", error)
   }
+    console.error("Error fetching teams:", error)
+    toast({
+      title: "Error fetching teams",
+      description: error.message,
+      variant: "destructive",
+    })
+  } finally {
+    setLoading(false)
+  }
+}
 
-  const handleSort = (field) => {
+
+  type SortableField = "name" | "points" | "created_at"
+  const handleSort = (field: SortableField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -101,6 +122,11 @@ export default function TeamsAdmin() {
       setIsEditDialogOpen(false)
       fetchTeams()
     } catch (error) {
+      if (error instanceof Error) {
+    console.error(error.message)
+  } else {
+    console.error("Unknown error", error)
+  }
       console.error("Error updating team:", error)
       toast({
         title: "Error updating team",
