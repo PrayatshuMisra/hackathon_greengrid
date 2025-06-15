@@ -16,32 +16,46 @@ const AIContext = createContext<AIContextType>({
 
 export const useAI = () => useContext(AIContext)
 
-let model: tf.LayersModel | null = null
-let labels: string[] = []
+// Caches
+let plasticModel: tf.LayersModel | null = null
+let plasticLabels: string[] = []
 
+let bikeModel: tf.LayersModel | null = null
+let bikeLabels: string[] = []
+
+// Load plastic-free model
 async function loadPlasticFreeModel() {
-  if (!model) {
-    model = await tf.loadLayersModel("/teachable/plastic-free/model.json")
-
+  if (!plasticModel) {
+    plasticModel = await tf.loadLayersModel("/teachable/plastic-free/model.json")
     try {
       const metadata = await fetch("/teachable/plastic-free/metadata.json").then((res) => res.json())
-      labels = metadata.labels || ["Plastic", "Plastic-Free"]
-    } catch (err) {
-      console.warn("Failed to load metadata, using fallback labels")
-      labels = ["Plastic", "Plastic-Free"]
+      plasticLabels = metadata.labels || ["Plastic", "Plastic-Free"]
+    } catch {
+      plasticLabels = ["Plastic", "Plastic-Free"]
     }
   }
-
-  if (labels.length === 0) throw new Error("Model loaded but no labels found.")
-  return { model, labels }
+  return { model: plasticModel, labels: plasticLabels }
 }
 
-async function runPlasticFreePrediction(file: File) {
-  await loadPlasticFreeModel()
+// Load bike-commute model
+async function loadBikeCommuteModel() {
+  if (!bikeModel) {
+    bikeModel = await tf.loadLayersModel("/teachable/bike-commute/model.json")
+    try {
+      const metadata = await fetch("/teachable/bike-commute/metadata.json").then((res) => res.json())
+      bikeLabels = metadata.labels || ["Not-Cycles", "Cycles"]
+    } catch {
+      bikeLabels = ["Not-Cycles", "Cycles"]
+    }
+  }
+  return { model: bikeModel, labels: bikeLabels }
+}
 
+// General prediction function
+async function runPrediction(file: File, model: tf.LayersModel, labels: string[], successLabel: string) {
   return new Promise<any>((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = async () => {
+    reader.onload = () => {
       const img = new Image()
       img.onload = async () => {
         const tensor = tf.browser.fromPixels(img)
@@ -50,19 +64,21 @@ async function runPlasticFreePrediction(file: File) {
           .div(255)
           .expandDims(0)
 
-        const prediction = model!.predict(tensor) as tf.Tensor
+        const prediction = model.predict(tensor) as tf.Tensor
         const data = await prediction.data()
         const results = labels.map((label, i) => ({
           label,
           confidence: data[i],
         }))
         const best = results.sort((a, b) => b.confidence - a.confidence)[0]
-        const isPlasticFree = best.label.toLowerCase().includes("plastic-free")
 
-        console.log("Model prediction results:", results)
+        const isSuccess = best.label.toLowerCase() === successLabel.toLowerCase() && best.confidence > 0.8
+
+        console.log("Best prediction:", best)
+        console.log("Full prediction:", results)
 
         resolve({
-          success: isPlasticFree && best.confidence > 0.8,
+          success: isSuccess,
           confidence: best.confidence,
           message: `Detected as "${best.label}"`,
           details: results.reduce((acc, cur) => ({
@@ -79,13 +95,19 @@ async function runPlasticFreePrediction(file: File) {
   })
 }
 
+// Main AI Provider
 export function AIProvider({ children }: { children: React.ReactNode }) {
   const verifyImage = async (file: File, challengeType: string) => {
     if (challengeType === "plastic-free") {
-      return await runPlasticFreePrediction(file)
+      const { model, labels } = await loadPlasticFreeModel()
+      return runPrediction(file, model, labels, "plastic-free")
     }
 
-    await new Promise((res) => setTimeout(res, 2000))
+    if (challengeType === "bike-commute") {
+      const { model, labels } = await loadBikeCommuteModel()
+      return runPrediction(file, model, labels, "cycles") // <- Use lowercase match
+    }
+
     return {
       success: false,
       confidence: 0.1,
@@ -128,5 +150,9 @@ export function AIProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  return <AIContext.Provider value={{ verifyImage, extractTextFromImage }}>{children}</AIContext.Provider>
+  return (
+    <AIContext.Provider value={{ verifyImage, extractTextFromImage }}>
+      {children}
+    </AIContext.Provider>
+  )
 }
