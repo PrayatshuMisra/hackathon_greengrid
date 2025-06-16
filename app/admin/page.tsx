@@ -97,11 +97,11 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <div className="border-b pb-2">
                     <p className="text-sm font-medium">New user registered</p>
-                    <p className="text-xs text-muted-foreground">John Doe - 10 minutes ago</p>
+                    <p className="text-xs text-muted-foreground">Salman Khan - 10 minutes ago</p>
                   </div>
                   <div className="border-b pb-2">
                     <p className="text-sm font-medium">Challenge completed</p>
-                    <p className="text-xs text-muted-foreground">Jane Smith - 25 minutes ago</p>
+                    <p className="text-xs text-muted-foreground">Tony Stark - 25 minutes ago</p>
                   </div>
                   <div className="border-b pb-2">
                     <p className="text-sm font-medium">New team created</p>
@@ -109,7 +109,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">Points redeemed</p>
-                    <p className="text-xs text-muted-foreground">Mike Johnson - 2 hours ago</p>
+                    <p className="text-xs text-muted-foreground">CR7 - 2 hours ago</p>
                   </div>
                 </div>
               </CardContent>
