@@ -39,6 +39,7 @@ export default function VerificationsAdmin() {
     try {
       setLoading(true)
 
+      // Updated query to use the correct table names and relationships
       const { data, error } = await supabase
         .from("challenge_submissions")
         .select(`
@@ -46,7 +47,7 @@ export default function VerificationsAdmin() {
           user:user_id(id, name, avatar_url),
           challenge:challenge_id(id, title, description)
         `)
-        .order(sortField, { ascending: sortDirection === "asc" })
+        .order(sortField === "created_at" ? "submitted_at" : sortField, { ascending: sortDirection === "asc" })
 
       if (error) throw error
 
@@ -64,10 +65,11 @@ export default function VerificationsAdmin() {
   }
 
   const handleSort = (field) => {
-    if (sortField === field) {
+    const mappedField = field === "created_at" ? "submitted_at" : field
+    if (sortField === mappedField) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
-      setSortField(field)
+      setSortField(mappedField)
       setSortDirection("asc")
     }
   }
@@ -255,7 +257,7 @@ export default function VerificationsAdmin() {
                           : "Pending"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(submission.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(submission.submitted_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -357,7 +359,7 @@ export default function VerificationsAdmin() {
                     </Avatar>
                     <span>{selectedSubmission.user?.name || "Unknown"}</span>
                     <span className="mx-2">•</span>
-                    <span>{new Date(selectedSubmission.created_at).toLocaleDateString()}</span>
+                    <span>{new Date(selectedSubmission.submitted_at).toLocaleDateString()}</span>
                   </div>
                 </div>
                 <Badge
