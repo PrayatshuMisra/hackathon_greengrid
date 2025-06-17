@@ -27,10 +27,15 @@ export default function LoginPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    setEmail("demo@greengrid.com")
-    setPassword("demo123")
-    setMounted(true)
-  }, [])
+  document.documentElement.classList.remove("dark")
+  document.documentElement.classList.add("light")
+  localStorage.setItem("greengrid-theme", "light")
+
+  setEmail("demo@greengrid.com")
+  setPassword("demo123")
+  setMounted(true)
+}, [])
+
 
   if (!mounted) return null
 

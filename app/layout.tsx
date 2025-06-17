@@ -1,7 +1,6 @@
-import type React from "react"
 import "./globals.css"
 import { Inter } from "next/font/google"
-import { Providers } from "./providers"
+import { Providers } from "./providers" // ✅ this wraps ThemeProvider
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -14,19 +13,16 @@ export const metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/Picture1.png" type="image/png" />
         <title>{metadata.title}</title>
         <meta name="description" content={metadata.description} />
+        <meta name="theme-color" content="#ffffff" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} transition-colors duration-300`} suppressHydrationWarning>
         <Providers>
           {children}
           <Toaster />

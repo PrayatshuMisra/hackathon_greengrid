@@ -153,6 +153,7 @@ export function Dashboard() {
             ? { ...challenge, progress: Math.min(100, challenge.progress + 20) }
             : challenge,
         )
+
         setActiveChallenges(updatedChallenges)
 
         if (updatedChallenges.find((c) => c.id === selectedChallenge.id)?.progress === 100) {

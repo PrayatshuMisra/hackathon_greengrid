@@ -27,24 +27,24 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 210 40% 4%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 210 40% 6%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 210 40% 6%;
     --popover-foreground: 210 40% 98%;
     --primary: 142 76% 36%;
     --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 210 40% 8%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 210 40% 8%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 210 40% 8%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 210 40% 15%;
+    --input: 210 40% 8%;
     --ring: 142 76% 36%;
   }
 }
@@ -56,9 +56,510 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  .dark *,
+  .dark *::before,
+  .dark *::after {
+    background-color: inherit !important;
+    color: inherit !important;
+  }
+
+  .dark html {
+    background-color: hsl(210 40% 4%) !important;
+    color: hsl(210 40% 98%) !important;
+  }
+
+  .dark body {
+    background-color: hsl(210 40% 4%) !important;
+    color: hsl(210 40% 98%) !important;
+    min-height: 100vh !important;
+  }
+
+  .dark #__next,
+  .dark [data-nextjs-scroll-focus-boundary] {
+    background-color: hsl(210 40% 4%) !important;
+    min-height: 100vh !important;
+  }
+
+  .dark .min-h-screen,
+  .dark .min-h-full,
+  .dark .h-screen,
+  .dark .h-full {
+    background-color: hsl(210 40% 4%) !important;
+  }
+
+  .dark .nav-gradient {
+    background: hsl(210 40% 4%) !important;
+    border-bottom: 1px solid hsl(210 40% 15%) !important;
+  }
+
+  .dark .theme-card,
+  .dark .theme-card-welcome,
+  .dark [data-card],
+  .dark .card {
+    background-color: hsl(210 40% 6%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 1px solid hsl(210 40% 15%) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dark button {
+    background-color: hsl(210 40% 10%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 1px solid hsl(210 40% 20%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.2s ease-in-out !important;
+  }
+
+  .dark button:hover {
+    background-color: hsl(210 40% 15%) !important;
+    border-color: hsl(210 40% 25%) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .dark button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dark .btn-primary,
+  .dark button.bg-green-600 {
+    background: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 76% 32%) 100%) !important;
+    color: white !important;
+    border: 1px solid hsl(142 76% 40%) !important;
+    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.2), 0 0 0 1px rgba(34, 197, 94, 0.1) !important;
+  }
+
+  .dark .btn-primary:hover,
+  .dark button.bg-green-600:hover {
+    background: linear-gradient(135deg, hsl(142 76% 40%) 0%, hsl(142 76% 36%) 100%) !important;
+    border-color: hsl(142 76% 45%) !important;
+    box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3), 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .dark .btn-secondary {
+    background-color: hsl(210 40% 12%) !important;
+    color: hsl(210 40% 90%) !important;
+    border: 1px solid hsl(210 40% 25%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .dark .btn-secondary:hover {
+    background-color: hsl(210 40% 18%) !important;
+    border-color: hsl(210 40% 30%) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  .dark button[variant="outline"] {
+    background-color: transparent !important;
+    color: hsl(210 40% 90%) !important;
+    border: 2px solid hsl(210 40% 25%) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark button[variant="outline"]:hover {
+    background-color: hsl(210 40% 8%) !important;
+    border-color: hsl(210 40% 35%) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    background-color: hsl(210 40% 8%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 2px solid hsl(210 40% 18%) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease-in-out !important;
+  }
+
+  .dark input:focus,
+  .dark textarea:focus,
+  .dark select:focus {
+    border-color: hsl(142 76% 36%) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+    outline: none !important;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: hsl(215 20.2% 55%) !important;
+  }
+
+  .dark .progress-bg,
+  .dark [role="progressbar"] {
+    background-color: hsl(210 40% 15%) !important;
+    border: 1px solid hsl(210 40% 20%) !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dark .progress-fill,
+  .dark [role="progressbar"] > div {
+    background: linear-gradient(90deg, hsl(142 76% 36%) 0%, hsl(142 76% 42%) 50%, hsl(142 76% 36%) 100%) !important;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+    border-radius: inherit !important;
+    position: relative !important;
+  }
+
+  .dark .progress-fill::after,
+  .dark [role="progressbar"] > div::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%) !important;
+    border-radius: inherit !important;
+    animation: shimmer 2s infinite !important;
+  }
+
+  .dark .badge {
+    background-color: hsl(210 40% 12%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 1px solid hsl(210 40% 25%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+    font-weight: 600 !important;
+  }
+
+  .dark .badge-success,
+  .dark .bg-green-200 {
+    background: linear-gradient(135deg, hsl(142 76% 36% / 0.2) 0%, hsl(142 76% 32% / 0.25) 100%) !important;
+    color: hsl(142 76% 80%) !important;
+    border: 1px solid hsl(142 76% 36% / 0.4) !important;
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.15), inset 0 1px 2px rgba(34, 197, 94, 0.1) !important;
+  }
+
+  .dark .badge-warning,
+  .dark .bg-yellow-100 {
+    background: linear-gradient(135deg, hsl(45 93% 47% / 0.2) 0%, hsl(45 93% 43% / 0.25) 100%) !important;
+    color: hsl(45 93% 80%) !important;
+    border: 1px solid hsl(45 93% 47% / 0.4) !important;
+    box-shadow: 0 2px 4px rgba(251, 191, 36, 0.15), inset 0 1px 2px rgba(251, 191, 36, 0.1) !important;
+  }
+
+  .dark .badge-info {
+    background: linear-gradient(135deg, hsl(200 100% 50% / 0.2) 0%, hsl(200 100% 46% / 0.25) 100%) !important;
+    color: hsl(200 100% 80%) !important;
+    border: 1px solid hsl(200 100% 50% / 0.4) !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15), inset 0 1px 2px rgba(59, 130, 246, 0.1) !important;
+  }
+
+  .dark .badge-error {
+    background: linear-gradient(135deg, hsl(0 84% 60% / 0.2) 0%, hsl(0 84% 56% / 0.25) 100%) !important;
+    color: hsl(0 84% 80%) !important;
+    border: 1px solid hsl(0 84% 60% / 0.4) !important;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15), inset 0 1px 2px rgba(239, 68, 68, 0.1) !important;
+  }
+
+  .dark .clickable-card,
+  .dark .hover\:shadow-lg:hover,
+  .dark .hover\:shadow-md:hover {
+    background-color: hsl(210 40% 6%) !important;
+    border: 2px solid hsl(210 40% 15%) !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s ease-in-out !important;
+    cursor: pointer !important;
+  }
+
+  .dark .clickable-card:hover,
+  .dark .hover\:shadow-lg:hover,
+  .dark .hover\:shadow-md:hover {
+    border-color: hsl(142 76% 36% / 0.5) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(34, 197, 94, 0.2) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .dark .clickable-card:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .dark .border-green-200,
+  .dark .bg-gradient-to-br.from-green-50 {
+    background-color: hsl(210 40% 6%) !important;
+    border: 2px solid hsl(142 76% 36% / 0.3) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(34, 197, 94, 0.05) !important;
+  }
+
+  .dark .border-blue-200,
+  .dark .bg-gradient-to-br.from-blue-50 {
+    background-color: hsl(210 40% 6%) !important;
+    border: 2px solid hsl(200 100% 50% / 0.3) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(59, 130, 246, 0.05) !important;
+  }
+
+  .dark .border-orange-200,
+  .dark .bg-gradient-to-br.from-orange-50 {
+    background-color: hsl(210 40% 6%) !important;
+    border: 2px solid hsl(25 95% 53% / 0.3) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(251, 146, 60, 0.05) !important;
+  }
+
+  .dark .border-emerald-200,
+  .dark .bg-gradient-to-br.from-emerald-50 {
+    background-color: hsl(210 40% 6%) !important;
+    border: 2px solid hsl(160 84% 39% / 0.3) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(52, 211, 153, 0.05) !important;
+  }
+
+  .dark .bg-green-50 {
+    background: linear-gradient(135deg, hsl(142 76% 36% / 0.08) 0%, hsl(142 76% 32% / 0.12) 100%) !important;
+    border: 2px solid hsl(142 76% 36% / 0.25) !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(34, 197, 94, 0.1) !important;
+    transition: all 0.3s ease-in-out !important;
+  }
+
+  .dark .bg-green-50:hover {
+    border-color: hsl(142 76% 36% / 0.4) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(34, 197, 94, 0.2) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .dark .border-yellow-300,
+  .dark .bg-yellow-50 {
+    background: linear-gradient(135deg, hsl(45 93% 47% / 0.1) 0%, hsl(45 93% 43% / 0.15) 100%) !important;
+    border: 2px solid hsl(45 93% 47% / 0.3) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(251, 191, 36, 0.1) !important;
+  }
+
+  .dark .border-gray-200,
+  .dark .bg-gray-50 {
+    background-color: hsl(210 40% 8%) !important;
+    border: 2px solid hsl(210 40% 18%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s ease-in-out !important;
+  }
+
+  .dark .border-gray-200:hover,
+  .dark .bg-gray-50:hover {
+    border-color: hsl(210 40% 25%) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  .dark .bg-green-200 {
+    background: linear-gradient(135deg, hsl(142 76% 36% / 0.2) 0%, hsl(142 76% 32% / 0.25) 100%) !important;
+    border: 1px solid hsl(142 76% 36% / 0.3) !important;
+    box-shadow: inset 0 1px 2px rgba(34, 197, 94, 0.1) !important;
+  }
+
+  .dark .bg-blue-200 {
+    background: linear-gradient(135deg, hsl(200 100% 50% / 0.2) 0%, hsl(200 100% 46% / 0.25) 100%) !important;
+    border: 1px solid hsl(200 100% 50% / 0.3) !important;
+    box-shadow: inset 0 1px 2px rgba(59, 130, 246, 0.1) !important;
+  }
+
+  .dark .bg-orange-200 {
+    background: linear-gradient(135deg, hsl(25 95% 53% / 0.2) 0%, hsl(25 95% 49% / 0.25) 100%) !important;
+    border: 1px solid hsl(25 95% 53% / 0.3) !important;
+    box-shadow: inset 0 1px 2px rgba(251, 146, 60, 0.1) !important;
+  }
+
+  .dark .bg-emerald-200 {
+    background: linear-gradient(135deg, hsl(160 84% 39% / 0.2) 0%, hsl(160 84% 35% / 0.25) 100%) !important;
+    border: 1px solid hsl(160 84% 39% / 0.3) !important;
+    box-shadow: inset 0 1px 2px rgba(52, 211, 153, 0.1) !important;
+  }
+
+  .dark .text-green-800,
+  .dark .text-green-700,
+  .dark .text-green-600 {
+    color: hsl(142 76% 70%) !important;
+  }
+
+  .dark .text-blue-800,
+  .dark .text-blue-700,
+  .dark .text-blue-600 {
+    color: hsl(200 100% 70%) !important;
+  }
+
+  .dark .text-orange-800,
+  .dark .text-orange-700,
+  .dark .text-orange-600 {
+    color: hsl(25 95% 70%) !important;
+  }
+
+  .dark .text-emerald-800,
+  .dark .text-emerald-700,
+  .dark .text-emerald-600 {
+    color: hsl(160 84% 70%) !important;
+  }
+
+  .dark .text-yellow-800,
+  .dark .text-yellow-600 {
+    color: hsl(45 93% 70%) !important;
+  }
+
+  .dark .text-gray-600,
+  .dark .text-gray-500,
+  .dark .text-gray-700 {
+    color: hsl(215 20.2% 65.1%) !important;
+  }
+
+  .dark select,
+  .dark [role="combobox"] {
+    background-color: hsl(210 40% 8%) !important;
+    border: 2px solid hsl(210 40% 20%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .dark select:hover,
+  .dark [role="combobox"]:hover {
+    border-color: hsl(210 40% 30%) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .dark input[type="checkbox"],
+  .dark input[type="radio"] {
+    background-color: hsl(210 40% 8%) !important;
+    border: 2px solid hsl(210 40% 25%) !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .dark input[type="checkbox"]:checked,
+  .dark input[type="radio"]:checked {
+    background-color: hsl(142 76% 36%) !important;
+    border-color: hsl(142 76% 40%) !important;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+  }
+
+  .dark [role="dialog"],
+  .dark .modal,
+  .dark [role="menu"],
+  .dark .dropdown-content {
+    background-color: hsl(210 40% 6%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 2px solid hsl(210 40% 18%) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark hr,
+  .dark .separator {
+    border-color: hsl(210 40% 18%) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .dark table {
+    background-color: hsl(210 40% 6%) !important;
+    color: hsl(210 40% 98%) !important;
+    border: 1px solid hsl(210 40% 15%) !important;
+  }
+
+  .dark th,
+  .dark td {
+    border-color: hsl(210 40% 15%) !important;
+  }
+
+  .dark th {
+    background-color: hsl(210 40% 8%) !important;
+  }
+
+  .dark tr:hover {
+    background-color: hsl(210 40% 8%) !important;
+  }
+
+  .dark a {
+    color: hsl(142 76% 60%) !important;
+    transition: color 0.2s ease-in-out !important;
+  }
+
+  .dark a:hover {
+    color: hsl(142 76% 70%) !important;
+    text-decoration: underline !important;
+  }
+
+  .dark code,
+  .dark pre {
+    background-color: hsl(210 40% 8%) !important;
+    color: hsl(210 40% 90%) !important;
+    border: 1px solid hsl(210 40% 15%) !important;
+  }
+
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    background-color: hsl(210 40% 6%) !important;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(210 40% 8%) !important;
+    border-radius: 4px !important;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(210 40% 25%) 0%, hsl(210 40% 20%) 100%) !important;
+    border-radius: 4px !important;
+    border: 1px solid hsl(210 40% 15%) !important;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(210 40% 30%) 0%, hsl(210 40% 25%) 100%) !important;
+  }
+
+  .dark ::selection {
+    background: hsl(142 76% 36% / 0.3) !important;
+    color: hsl(210 40% 98%) !important;
+  }
+
+  .dark :focus-visible {
+    outline: 2px solid hsl(142 76% 36%) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1) !important;
+  }
+
+  .dark div,
+  .dark section,
+  .dark main,
+  .dark article,
+  .dark aside,
+  .dark header,
+  .dark footer,
+  .dark nav {
+    background-color: inherit !important;
+  }
+
+  .dark [class*="bg-white"],
+  .dark [style*="background-color: white"],
+  .dark [style*="background: white"],
+  .dark [style*="background-color: #fff"],
+  .dark [style*="background: #fff"],
+  .dark [style*="background-color: #ffffff"],
+  .dark [style*="background: #ffffff"] {
+    background-color: hsl(210 40% 6%) !important;
+  }
+
+  .dark [class*="bg-gray-100"],
+  .dark [class*="bg-slate-50"],
+  .dark [class*="bg-slate-100"] {
+    background-color: hsl(210 40% 8%) !important;
+  }
+
+  .dark [class*="text-gray-900"],
+  .dark [class*="text-slate-900"],
+  .dark [class*="text-black"] {
+    color: hsl(210 40% 98%) !important;
+  }
+
+  .dark .container,
+  .dark .wrapper,
+  .dark .content,
+  .dark .layout,
+  .dark .page,
+  .dark .app,
+  .dark .space-y-6,
+  .dark .space-y-4,
+  .dark .space-y-3 {
+    background-color: hsl(210 40% 4%) !important;
+  }
 }
 
-/* Custom animations */
 @keyframes float {
   0%,
   100% {
@@ -90,6 +591,15 @@
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .float-animation {
   animation: float 3s ease-in-out infinite;
 }
@@ -102,7 +612,12 @@
   animation: grow 0.5s ease-out;
 }
 
-/* Nature-inspired gradients */
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
 .nature-gradient {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -119,7 +634,6 @@
   background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -135,4 +649,30 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #16a34a;
+}
+
+@media print {
+  .dark {
+    color-scheme: light !important;
+  }
+
+  .dark * {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .dark {
+    --border: 0 0% 50%;
+    --ring: 142 76% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

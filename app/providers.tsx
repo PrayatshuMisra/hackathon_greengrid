@@ -8,6 +8,7 @@ import { RealtimeProvider } from "@/lib/realtime"
 import { GeolocationProvider } from "@/lib/geolocation"
 import { AIProvider } from "@/lib/ai-verification"
 import { ToastProvider } from "@/components/ui/toast"
+import { ThemeProvider } from "@/contexts/theme-context"
 
 const supabase = createClientComponentClient({
   supabaseUrl: "https://lenuuxzhvadftlfbozox.supabase.co",
@@ -31,12 +32,14 @@ interface AppContextType {
   user: User | null
   supabase: any
   loading: boolean
+  signOut: () => Promise<void>
 }
 
 const AppContext = createContext<AppContextType>({
   user: null,
   supabase,
   loading: true,
+  signOut: async () => {}, // fallback
 })
 
 export const useApp = () => useContext(AppContext)
@@ -44,6 +47,11 @@ export const useApp = () => useContext(AppContext)
 export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
 
   useEffect(() => {
     const getUser = async () => {
@@ -85,13 +93,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
             const userData = {
               id: session.user.id,
               email: session.user.email || "",
-              name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
+              name:
+                session.user.user_metadata?.name ||
+                session.user.email?.split("@")[0] ||
+                "User",
               avatar_url: session.user.user_metadata?.avatar_url || null,
               total_points: 0,
               level: 1,
             }
 
-            const { error: insertError } = await supabase.from("profiles").insert(userData)
+            const { error: insertError } = await supabase
+              .from("profiles")
+              .insert(userData)
 
             if (insertError) {
               console.error("Error creating user profile:", insertError)
@@ -135,14 +148,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ user, supabase, loading }}>
-      <ToastProvider>
-        <RealtimeProvider>
-          <GeolocationProvider>
-            <AIProvider>{children}</AIProvider>
-          </GeolocationProvider>
-        </RealtimeProvider>
-      </ToastProvider>
-    </AppContext.Provider>
+    <ThemeProvider>
+      <AppContext.Provider value={{ user, supabase, loading, signOut }}>
+        <ToastProvider>
+          <RealtimeProvider>
+            <GeolocationProvider>
+              <AIProvider>{children}</AIProvider>
+            </GeolocationProvider>
+          </RealtimeProvider>
+        </ToastProvider>
+      </AppContext.Provider>
+    </ThemeProvider>
   )
 }
