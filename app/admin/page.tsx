@@ -1,161 +1,183 @@
 "use client"
 
+import type React from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Award, Briefcase, MessageSquare, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Shield, Eye, EyeOff, Lock, User, Leaf } from "lucide-react"
 
-export default function AdminDashboard() {
+export default function AdminPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [showEasterEgg, setShowEasterEgg] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const adminSession = localStorage.getItem("admin_session")
+        if (adminSession) {
+          const session = JSON.parse(adminSession)
+          if (session.email === "admin@greengrid.com" && session.role === "admin") {
+            const loginTime = new Date(session.loginTime)
+            const now = new Date()
+            const hoursDiff = (now.getTime() - loginTime.getTime()) / (1000 * 60 * 60)
+            if (hoursDiff < 24) {
+              setIsAuthenticated(true)
+              router.push("/admin/dashboard")
+              return
+            }
+          }
+        }
+        setIsAuthenticated(false)
+      } catch (error) {
+        console.error("Error checking auth:", error)
+        setIsAuthenticated(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    if (email === "admin@greengrid.com" && password === "GreenGrid2025!!") {
+      const adminSession = {
+        email: "admin@greengrid.com",
+        role: "admin",
+        loginTime: new Date().toISOString(),
+      }
+      localStorage.setItem("admin_session", JSON.stringify(adminSession))
+      setIsAuthenticated(true)
+      router.push("/admin/dashboard")
+    } else {
+      setError("Invalid credentials. Please check your email and password.")
+    }
+
+    setIsLoading(false)
+  }
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-500 to-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-800 mx-auto"></div>
+          <p className="mt-4 text-green-900">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to the GreenGrid admin dashboard.</p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">1,248</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-              <ArrowUpRight className="mr-1 h-4 w-4 text-green-500" />
-              <span className="text-green-500">+12%</span> from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Challenges</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-              <ArrowUpRight className="mr-1 h-4 w-4 text-green-500" />
-              <span className="text-green-500">+4</span> from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Teams</CardTitle>
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">42</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-              <ArrowUpRight className="mr-1 h-4 w-4 text-green-500" />
-              <span className="text-green-500">+8</span> from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Community Posts</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">136</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-              <ArrowDownRight className="mr-1 h-4 w-4 text-red-500" />
-              <span className="text-red-500">-2%</span> from last month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>User Activity</CardTitle>
-                <CardDescription>User signups and active users over time</CardDescription>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-[200px] flex items-center justify-center bg-muted/20 rounded-md">
-                  <TrendingUp className="h-8 w-8 text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Activity Chart</span>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest platform activities</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="border-b pb-2">
-                    <p className="text-sm font-medium">New user registered</p>
-                    <p className="text-xs text-muted-foreground">Salman Khan - 10 minutes ago</p>
-                  </div>
-                  <div className="border-b pb-2">
-                    <p className="text-sm font-medium">Challenge completed</p>
-                    <p className="text-xs text-muted-foreground">Tony Stark - 25 minutes ago</p>
-                  </div>
-                  <div className="border-b pb-2">
-                    <p className="text-sm font-medium">New team created</p>
-                    <p className="text-xs text-muted-foreground">Green Warriors - 1 hour ago</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Points redeemed</p>
-                    <p className="text-xs text-muted-foreground">CR7 - 2 hours ago</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-500 to-white p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="space-y-1 text-center">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-green-600 to-emerald-500 rounded-full flex items-center justify-center mb-4">
+            <Shield className="h-8 w-8 text-white" />
           </div>
-        </TabsContent>
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Analytics</CardTitle>
-              <CardDescription>Detailed platform analytics and metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                <span className="text-muted-foreground">Analytics content will appear here</span>
+          <CardTitle className="text-2xl font-bold text-green-800">Admin Login</CardTitle>
+          <CardDescription className="text-green-600">Enter your admin credentials to access the dashboard</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@greengrid.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10"
+                  required
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reports</CardTitle>
-              <CardDescription>Generated reports and statistics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                <span className="text-muted-foreground">Reports content will appear here</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>System notifications and alerts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                <span className="text-muted-foreground">Notifications content will appear here</span>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Signing in...
+                </>
+              ) : (
+                "Access Admin Panel"
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 p-4 bg-green-50 rounded-lg">
+            <p className="text-sm text-green-700 font-medium mb-2">Need access?</p>
+            <p className="text-xs text-green-600 italic">
+              Only tree-huggers and carbon-busters allowed 🍃
+            </p>
+            <button
+              onClick={() => setShowEasterEgg(!showEasterEgg)}
+              className="mt-2 text-xs text-green-800 underline hover:text-green-600 transition-all"
+            >
+              <Leaf className="inline h-4 w-4 mr-1" />
+              Hint?
+            </button>
+            {showEasterEgg && (
+              <div className="mt-2 text-xs text-green-700 font-mono">
+                Email: <strong>admin@greengrid.com</strong><br />
+                Password: <strong><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"><u>Get it here</u></a></strong><br />
+                <span className="text-green-500">P.S. Don’t tell the trees. 🤫</span>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

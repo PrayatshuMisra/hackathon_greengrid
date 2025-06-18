@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -18,23 +18,23 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const { toast } = useToast()
-  const router = useRouter()
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut()
+      localStorage.removeItem("admin_session")
+
       toast({
         title: "Signed out successfully",
         description: "You have been signed out of the admin dashboard",
       })
-      router.push("/auth/login")
+
+      router.push("/admin")
     } catch (error) {
       toast({
         title: "Error signing out",
@@ -47,7 +47,7 @@ export function AdminSidebar() {
   const navItems = [
     {
       title: "Dashboard",
-      href: "/admin",
+      href: "/admin/dashboard",
       icon: <LayoutDashboard className="h-5 w-5" />,
     },
     {
