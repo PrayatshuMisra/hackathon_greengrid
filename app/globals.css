@@ -676,3 +676,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  body {
+    cursor: url('/palm.png'), auto;
+  }
+}
+

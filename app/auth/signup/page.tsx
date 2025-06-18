@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { toast } from "@/components/ui/use-toast";
+import { motion } from "framer-motion"; // ✅ Add this line
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -120,7 +121,7 @@ export default function SignupPage() {
   const handleSocialSignup = async (provider: "github" | "twitter") => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider : "github",
+        provider: "github",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -133,8 +134,42 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-blue-50 to-teal-50 p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+      {/* 🔵 Animated Eco Background */}
+      <div className="absolute inset-0 -z-10">
+        <svg viewBox="0 0 1440 320" className="w-full h-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="ecoGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#bbf7d0" />
+              <stop offset="100%" stopColor="#bfdbfe" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#ecoGrad)">
+            <animate
+              attributeName="d"
+              dur="12s"
+              repeatCount="indefinite"
+              values="
+                M0,160 C480,320 960,0 1440,160 L1440,320 L0,320 Z;
+                M0,120 C480,280 960,40 1440,120 L1440,320 L0,320 Z;
+                M0,160 C480,320 960,0 1440,160 L1440,320 L0,320 Z
+              "
+            />
+          </path>
+        </svg>
+      </div>
+
+      {/* 🍃 Floating Leaf */}
+      <motion.div
+        className="absolute top-10 left-10 text-green-600 opacity-80"
+        animate={{ y: [0, -10, 0], x: [0, 10, 0], rotate: [0, 15, -15, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Leaf className="h-10 w-10" />
+      </motion.div>
+
+      {/* ✅ Unchanged content below */}
+      <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-2">
             <div className="relative">
@@ -159,6 +194,7 @@ export default function SignupPage() {
           )}
 
           <form onSubmit={handleSignup} className="space-y-4">
+            {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <div className="relative">
@@ -175,6 +211,7 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -191,6 +228,7 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">

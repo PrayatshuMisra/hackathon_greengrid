@@ -92,3 +92,17 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  body,
+button,
+a,
+input,
+select,
+textarea,
+div,
+span,
+label {
+  cursor: url('/palm.png'), auto !important;
+}
+}
