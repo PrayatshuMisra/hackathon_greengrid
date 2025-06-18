@@ -100,7 +100,7 @@ export default function AdminPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@greengrid.com"
+                  placeholder="Enter Admin Email-Id.."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
