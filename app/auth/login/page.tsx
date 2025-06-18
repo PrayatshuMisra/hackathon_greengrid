@@ -90,9 +90,9 @@ router.push("/dashboard");
   const handleSocialLogin = async (provider: "github" | "twitter") => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: "https://hackathon-greengrid.vercel.app/auth/callback",
         },
       })
 

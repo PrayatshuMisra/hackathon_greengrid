@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -377,26 +377,26 @@ export function Community() {
             {[
               {
                 title: "Community Tree Plantation Drive",
-                date: "Dec 15, 2024",
+                date: "July 15, 2025",
                 location: "Central Park, Delhi",
                 organizer: "Green Delhi Initiative",
                 participants: 45,
               },
               {
                 title: "Plastic-Free Workshop",
-                date: "Dec 18, 2024",
+                date: "July 18, 2025",
                 location: "Online Event",
                 organizer: "Zero Waste India",
                 participants: 128,
               },
               {
                 title: "Solar Energy Awareness Session",
-                date: "Dec 22, 2024",
+                date: "July 22, 2025",
                 location: "Tech Hub, Bangalore",
                 organizer: "Renewable Energy Forum",
                 participants: 67,
               },
-            ].map((event, index) => (
+            ].map((event: { title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; organizer: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; participants: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; date: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; location: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined }, index: Key | null | undefined) => (
               <div key={index} className="border border-green-200 rounded-lg p-4 bg-green-50">
                 <div className="flex justify-between items-start mb-2">
                   <div>

@@ -1,4 +1,4 @@
-import { Leaf, Heart } from "lucide-react"
+import { Leaf, Heart } from "lucide-react";
 
 export function Footer() {
   return (
@@ -12,7 +12,8 @@ export function Footer() {
               <span className="text-2xl font-bold">GreenGrid</span>
             </div>
             <p className="text-green-200 text-sm leading-relaxed">
-              Unite, Act, Compete — For a Greener Future. Join thousands of eco-warriors making a real difference.
+              Unite, Act, Compete — For a Greener Future. Join thousands of
+              eco-warriors making a real difference.
             </p>
             <div className="flex items-center space-x-1 text-green-300">
               <span className="text-sm">Made with</span>
@@ -28,13 +29,46 @@ export function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-green-200">Platform</h4>
             <ul className="space-y-3 text-sm">
-              {["How it Works", "Challenges", "Teams", "Rewards", "Leaderboard"].map((item) => (
-                <li key={item}>
-                  <a href="#" className="text-green-300 hover:text-white transition-colors duration-200">
-                    {item}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <a
+                  href="/dashboard"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  How it Works
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/challenges"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Challenges
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/teams"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Teams
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/ecowallet"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Rewards
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/leaderboard"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Leaderboard
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -42,13 +76,46 @@ export function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-green-200">Community</h4>
             <ul className="space-y-3 text-sm">
-              {["Forum", "Events", "Success Stories", "Blog", "Newsletter"].map((item) => (
-                <li key={item}>
-                  <a href="#" className="text-green-300 hover:text-white transition-colors duration-200">
-                    {item}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <a
+                  href="/community"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Forum
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/community"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Events
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/community"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Success Stories
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/community"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Blog
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/community"
+                  className="text-green-300 hover:text-white transition-colors duration-200"
+                >
+                  Newsletter
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -56,23 +123,34 @@ export function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-green-200">Support</h4>
             <ul className="space-y-3 text-sm">
-              {["Help Center", "Contact Us", "Privacy Policy", "Terms of Service", "API Docs"].map((item) => (
-                <li key={item}>
-                  <a href="#" className="text-green-300 hover:text-white transition-colors duration-200">
-                    {item}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <span className="text-green-300 hover:text-white transition-colors duration-200 dark:text-green-400">
+                  Help Center
+                </span>
+                <p className="block text-white dark:text-green-400">
+                  Team cOdeSNiPers, MIT Manipal, Manipal
+                </p>
+              </li>
+              <li>
+                <span className="text-green-300 hover:text-white transition-colors duration-200 dark:text-green-400">
+                  Contact Us
+                </span>
+                <p className="block text-white dark:text-green-400">
+                  admin@greengrid.com
+                </p>
+                <p className="block text-white dark:text-green-400">+91 9999XXXXXX</p>
+              </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-green-700 mt-8 pt-8 text-center">
           <p className="text-sm text-green-300">
-            &copy; 2025 GreenGrid. All rights reserved. Making the world greener, one challenge at a time.
+            &copy; 2025 GreenGrid. All rights reserved. Making the world
+            greener, one challenge at a time.
           </p>
         </div>
       </div>
     </footer>
-  )
+  );
 }
