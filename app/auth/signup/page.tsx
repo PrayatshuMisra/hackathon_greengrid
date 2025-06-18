@@ -168,7 +168,7 @@ export default function SignupPage() {
         <Leaf className="h-10 w-10" />
       </motion.div>
 
-      {/* ✅ Unchanged content below */}
+      {/*Unchanged content below */}
       <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-2">
