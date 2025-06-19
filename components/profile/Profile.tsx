@@ -1,8 +1,10 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import HelpCenterModal from '@/components/map/HelpCenterModal';
+import MailModal from '@/components/ui/MailModal';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,10 +19,12 @@ import { Camera, Award, CheckCircle, Shield, Bell, Lock, HelpCircle } from "luci
 import { toast } from "@/components/ui/use-toast"
 
 export function Profile() {
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
   const [activeTab, setActiveTab] = useState("profile")
   const { user } = useApp()
   const [loading, setLoading] = useState(false)
-
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || "Salman Khan",
     email: user?.email || "salman@email.com",
@@ -29,6 +33,24 @@ export function Profile() {
     bio: "Passionate about sustainable living and climate action. Love cycling and growing my own vegetables!",
     avatar: user?.avatar_url || "/placeholder.svg",
   })
+
+  const supabase = createClientComponentClient();
+const [userEmail, setUserEmail] = useState('');
+
+useEffect(() => {
+  const fetchUser = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user?.email) {
+      setUserEmail(user.email);
+    }
+  };
+
+  fetchUser();
+}, []);
+
 
   const userStats = {
     totalPoints: 2340,
@@ -447,20 +469,62 @@ export function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full">
+                {/* <Button variant="outline" className="w-full">
                   Help Center
+                </Button> */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsHelpCenterOpen(true)}
+                >
+                Help Center
                 </Button>
-                <Button variant="outline" className="w-full">
-                  Contact Support
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Report a Bug
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Feature Request
-                </Button>
+
+                <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                setEmailSubject('Bug Report');
+                setMailModalOpen(true);
+              }}
+              >
+              Report a Bug
+              </Button>
+
+              <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+              setEmailSubject('Feature Request');
+              setMailModalOpen(true);
+              }}
+              >
+              Feature Request
+              </Button>
+
+            <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+            setEmailSubject('Contact Support');
+            setMailModalOpen(true);
+            }}
+            >
+            Contact Support
+            </Button>
               </CardContent>
             </Card>
+            <HelpCenterModal
+            isOpen={isHelpCenterOpen}
+            onRequestClose={() => setIsHelpCenterOpen(false)}
+            />
+            <MailModal
+            isOpen={mailModalOpen}
+            onRequestClose={() => setMailModalOpen(false)}
+            recipient="greengrid.care@gmail.com"
+            subject={emailSubject}
+            sender={userEmail}
+            />
           </div>
         </TabsContent>
       </Tabs>

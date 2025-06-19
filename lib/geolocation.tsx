@@ -38,10 +38,15 @@ export function GeolocationProvider({ children }: { children: React.ReactNode })
           getLocationBasedContent(latitude, longitude)
         },
         (error) => {
-          console.error("Geolocation error:", error)
-        
-          setLocation({ lat: 28.6139, lng: 77.209, city: "Delhi" })
-        },
+          if (error.code === error.PERMISSION_DENIED) {
+            console.warn("User denied the request for Geolocation.");
+          } else {
+              console.error("Geolocation error:", error?.message || error);
+          }
+
+          setLocation({ lat: 28.6139, lng: 77.209, city: "Delhi" });
+        }
+
       )
     }
   }, [])
