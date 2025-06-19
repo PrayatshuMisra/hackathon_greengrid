@@ -87,7 +87,11 @@ export function CertificatePreview({
 
   return (
     <div className="space-y-4 relative">
-      {showConfetti && <Confetti width={width} height={height} numberOfPieces={300} />}
+      {showConfetti && (
+  <div className="fixed inset-0 z-50 pointer-events-none">
+    <Confetti width={width} height={height} numberOfPieces={300} recycle={false} />
+  </div>
+)}
 
       {/* Certificate */}
       <div
