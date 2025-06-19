@@ -1,6 +1,6 @@
 "use client"
 
-import { MapView } from "@/components/map/MapView"
+import {MapView} from "@/components/map/MapView";
 import { Navigation } from "@/components/layout/Navigation"
 import { Footer } from "@/components/layout/Footer"
 
