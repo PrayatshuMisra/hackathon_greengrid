@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useApp } from "@/app/providers"
 import { Coins, TreePine, Star, Award, TrendingUp, Check, Copy } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
+import { QRModal } from "@/components/wallet/QRModal";
 
 export function EcoWallet() {
   const [activeTab, setActiveTab] = useState("donations")
@@ -73,7 +74,6 @@ export function EcoWallet() {
         </Card>
       </div>
 
-      {/* Reward Categories */}
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="donations">Tree Donations</TabsTrigger>
@@ -100,14 +100,11 @@ export function EcoWallet() {
                   <p className="text-sm text-green-600 mb-3">Impact: {donation.impact}</p>
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-green-700">{donation.cost} pts</span>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
+                    <QRModal
+                      qrImageSrc="/qr/meme-reward.jpg"
                       disabled={userStats.totalPoints < donation.cost}
-                      onClick={() => redeemReward(donation)}
-                    >
-                      Redeem
-                    </Button>
+                      onRedeem={() => redeemReward(donation)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -118,34 +115,10 @@ export function EcoWallet() {
         <TabsContent value="coupons" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              {
-                name: "Organic Store 20% Off",
-                cost: 300,
-                brand: "Nature's Basket",
-                validity: "30 days",
-                code: "ECO20",
-              },
-              {
-                name: "Solar Panel 15% Discount",
-                cost: 1500,
-                brand: "SunPower India",
-                validity: "60 days",
-                code: "SOLAR15",
-              },
-              {
-                name: "Electric Vehicle Test Drive",
-                cost: 200,
-                brand: "Tata Motors",
-                validity: "15 days",
-                code: "EVDRIVE",
-              },
-              {
-                name: "Eco-Friendly Clothing 25% Off",
-                cost: 400,
-                brand: "Sustainable Fashion Co.",
-                validity: "45 days",
-                code: "GREEN25",
-              },
+              { name: "Organic Store 20% Off", cost: 300, brand: "Nature's Basket", validity: "30 days", code: "ECO20" },
+              { name: "Solar Panel 15% Discount", cost: 1500, brand: "SunPower India", validity: "60 days", code: "SOLAR15" },
+              { name: "Electric Vehicle Test Drive", cost: 200, brand: "Tata Motors", validity: "15 days", code: "EVDRIVE" },
+              { name: "Eco-Friendly Clothing 25% Off", cost: 400, brand: "Sustainable Fashion Co.", validity: "45 days", code: "GREEN25" },
             ].map((coupon, index) => (
               <Card key={index} className="border-blue-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
@@ -157,14 +130,11 @@ export function EcoWallet() {
                   <p className="text-sm text-blue-600 mb-3">Valid for {coupon.validity}</p>
                   <div className="flex justify-between items-center mb-3">
                     <span className="font-bold text-blue-700">{coupon.cost} pts</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <QRModal
+                      qrImageSrc="/qr/meme-reward.jpg"
                       disabled={userStats.totalPoints < coupon.cost}
-                      onClick={() => redeemReward(coupon)}
-                    >
-                      Redeem
-                    </Button>
+                      onRedeem={() => redeemReward(coupon)}
+                    />
                   </div>
                   <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
                     <code className="text-sm font-mono">{coupon.code}</code>
@@ -204,14 +174,11 @@ export function EcoWallet() {
                   <p className="text-sm text-gray-600 mb-3">{product.description}</p>
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-orange-700">{product.cost} pts</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <QRModal
+                      qrImageSrc="/qr/meme-reward.jpg"
                       disabled={userStats.totalPoints < product.cost}
-                      onClick={() => redeemReward(product)}
-                    >
-                      Redeem
-                    </Button>
+                      onRedeem={() => redeemReward(product)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -223,18 +190,8 @@ export function EcoWallet() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { name: "Climate Hero Badge", cost: 500, rarity: "Rare", description: "Digital achievement badge" },
-              {
-                name: "Eco Warrior Certificate",
-                cost: 800,
-                rarity: "Epic",
-                description: "Verified eco-action certificate",
-              },
-              {
-                name: "Green Champion Trophy",
-                cost: 1000,
-                rarity: "Legendary",
-                description: "Ultimate eco-achievement",
-              },
+              { name: "Eco Warrior Certificate", cost: 800, rarity: "Epic", description: "Verified eco-action certificate" },
+              { name: "Green Champion Trophy", cost: 1000, rarity: "Legendary", description: "Ultimate eco-achievement" },
               { name: "Planet Protector Emblem", cost: 350, rarity: "Common", description: "Show your commitment" },
             ].map((nft, index) => (
               <Card key={index} className="border-purple-200 hover:shadow-md transition-shadow">
@@ -243,20 +200,15 @@ export function EcoWallet() {
                     <Award className="h-5 w-5 text-purple-600" />
                     <h3 className="font-semibold">{nft.name}</h3>
                   </div>
-                  <Badge variant="outline" className="mb-2">
-                    {nft.rarity}
-                  </Badge>
+                  <Badge variant="outline" className="mb-2">{nft.rarity}</Badge>
                   <p className="text-sm text-gray-600 mb-3">{nft.description}</p>
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-purple-700">{nft.cost} pts</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <QRModal
+                      qrImageSrc="/qr/meme-reward.jpg"
                       disabled={userStats.totalPoints < nft.cost}
-                      onClick={() => redeemReward(nft)}
-                    >
-                      Mint
-                    </Button>
+                      onRedeem={() => redeemReward(nft)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -265,7 +217,6 @@ export function EcoWallet() {
         </TabsContent>
       </Tabs>
 
-      {/* Transaction History */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Transactions</CardTitle>
