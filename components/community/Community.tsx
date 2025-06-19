@@ -1,6 +1,6 @@
 "use client"
 
-import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useState } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,10 +23,30 @@ export function Community() {
   const [postContent, setPostContent] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
   const [likedPosts, setLikedPosts] = useState<number[]>([])
-  const [comments, setComments] = useState<{ [key: number]: string[] }>({})
+  const [comments, setComments] = useState<{ [key: number]: string[] }>({
+    1: [
+      "Composting indoors? Try bokashi composting - no smell!",
+      "I use a small bin with a tight lid and add lots of brown material like shredded paper",
+      "The key is balancing greens and browns - about 2:1 ratio works best for me"
+    ],
+    2: [
+      "Great job! How did you handle grocery shopping?",
+      "I switched to glass containers too - game changer!"
+    ],
+    3: [
+      "I use a smart plug with energy monitoring",
+      "Check out the Kill A Watt electricity usage monitor"
+    ],
+    4: [
+      "I'll be there with 3 friends!",
+      "What time does it start?",
+      "Do we need to bring anything?"
+    ]
+  })
   const [commentText, setCommentText] = useState("")
   const [postTitle, setPostTitle] = useState("")
   const [postCategory, setPostCategory] = useState("tips")
+  const [expandedPosts, setExpandedPosts] = useState<number[]>([])
 
   const forumCategories = [
     { id: "tips", name: "Tips & Tricks", icon: "💡", posts: 234 },
@@ -91,14 +111,10 @@ export function Community() {
 
   const handleLike = (postId: number) => {
     if (likedPosts.includes(postId)) {
-     
       setLikedPosts((prev) => prev.filter((id) => id !== postId))
-
       setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes - 1 } : post)))
     } else {
-    
       setLikedPosts((prev) => [...prev, postId])
-
       setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post)))
     }
   }
@@ -117,10 +133,24 @@ export function Community() {
   }
 
   const handleShare = (postId: number) => {
-
     const shareLink = `${window.location.origin}/community/post/${postId}`
-    navigator.clipboard.writeText(shareLink)
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'Check out this post on GreenGrid',
+        text: 'I found this interesting post in the GreenGrid community',
+        url: shareLink,
+      }).catch(err => {
+        console.error('Error sharing:', err)
+        fallbackShare(shareLink)
+      })
+    } else {
+      fallbackShare(shareLink)
+    }
+  }
 
+  const fallbackShare = (shareLink: string) => {
+    navigator.clipboard.writeText(shareLink)
     toast({
       title: "Link Copied!",
       description: "Post link has been copied to clipboard.",
@@ -128,8 +158,16 @@ export function Community() {
     })
   }
 
+  const togglePostExpansion = (postId: number) => {
+    setExpandedPosts(prev => 
+      prev.includes(postId) 
+        ? prev.filter(id => id !== postId) 
+        : [...prev, postId]
+    )
+  }
+
   const handleCreatePost = () => {
-    if (!postContent.trim()) return
+    if (!postContent.trim() || !postTitle.trim()) return
 
     const newPost = {
       id: forumPosts.length + 1,
@@ -144,7 +182,6 @@ export function Community() {
     }
 
     setForumPosts((prev) => [newPost, ...prev])
-
     setNewPostOpen(false)
     setPostContent("")
     setPostTitle("")
@@ -158,6 +195,7 @@ export function Community() {
 
   return (
     <div className="space-y-6">
+      {/* Header and New Post Button */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-green-800">Community Forum</h2>
@@ -303,7 +341,10 @@ export function Community() {
                         <Heart className="h-4 w-4" fill={likedPosts.includes(post.id) ? "currentColor" : "none"} />
                         <span>{post.likes}</span>
                       </button>
-                      <button className="flex items-center space-x-1 hover:text-blue-600">
+                      <button 
+                        className="flex items-center space-x-1 hover:text-blue-600"
+                        onClick={() => togglePostExpansion(post.id)}
+                      >
                         <MessageSquare className="h-4 w-4" />
                         <span>{post.replies}</span>
                       </button>
@@ -317,26 +358,38 @@ export function Community() {
                     </div>
                   </div>
                 </div>
-                {/* Comments Section */}
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  {comments[post.id]?.map((comment, i) => (
-                    <div key={i} className="text-sm mb-2 pl-2 border-l-2 border-gray-200">
-                      <p className="text-gray-700">{comment}</p>
+                
+                {/* Comments Section - Only shown when expanded */}
+                {expandedPosts.includes(post.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="mb-4 space-y-3">
+                      {comments[post.id]?.map((comment, i) => (
+                        <div key={i} className="flex items-start space-x-2">
+                          <Avatar className="h-6 w-6 mt-1">
+                            <AvatarImage src="/placeholder.svg" />
+                            <AvatarFallback>U{i+1}</AvatarFallback>
+                          </Avatar>
+                          <div className="bg-gray-100 rounded-lg p-2 px-3 text-sm">
+                            <p className="font-medium text-gray-700">User {i+1}</p>
+                            <p className="text-gray-600">{comment}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  <div className="flex mt-2">
-                    <Input
-                      placeholder="Add a comment..."
-                      className="text-sm mr-2"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleComment(post.id)}
-                    />
-                    <Button size="sm" onClick={() => handleComment(post.id)}>
-                      Post
-                    </Button>
+                    <div className="flex mt-2">
+                      <Input
+                        placeholder="Add a comment..."
+                        className="text-sm mr-2"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && handleComment(post.id)}
+                      />
+                      <Button size="sm" onClick={() => handleComment(post.id)}>
+                        Post
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -396,7 +449,7 @@ export function Community() {
                 organizer: "Renewable Energy Forum",
                 participants: 67,
               },
-            ].map((event: { title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; organizer: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; participants: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; date: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; location: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined }, index: Key | null | undefined) => (
+            ].map((event, index) => (
               <div key={index} className="border border-green-200 rounded-lg p-4 bg-green-50">
                 <div className="flex justify-between items-start mb-2">
                   <div>

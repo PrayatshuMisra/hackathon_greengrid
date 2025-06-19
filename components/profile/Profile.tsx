@@ -1,8 +1,12 @@
 "use client"
-
-import type React from "react"
-
-import { useState } from "react"
+import HelpCenterModal from '@/components/map/HelpCenterModal';
+import MailModal from '@/components/ui/MailModal';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect, useRef, useState } from "react"
+import { toPng } from "html-to-image"
+import { Camera, Award, CheckCircle, Shield, Bell, Lock, HelpCircle, Share2 } from "lucide-react"
+import { FaWhatsapp, FaFacebook, FaXTwitter, FaInstagram } from "react-icons/fa6"
+import { toast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,14 +16,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useApp } from "@/app/providers"
-import { Camera, Award, CheckCircle, Shield, Bell, Lock, HelpCircle } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { supabase } from '@/lib/supabase' // Import Supabase client
 
 export function Profile() {
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
   const [activeTab, setActiveTab] = useState("profile")
   const { user } = useApp()
   const [loading, setLoading] = useState(false)
+  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
+  const [downloadingData, setDownloadingData] = useState(false)
 
   const [profileData, setProfileData] = useState({
     name: user?.name || "Salman Khan",
@@ -30,6 +38,23 @@ export function Profile() {
     avatar: user?.avatar_url || "/placeholder.svg",
   })
 
+const supabase = createClientComponentClient();
+const [userEmail, setUserEmail] = useState('');
+
+useEffect(() => {
+  const fetchUser = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user?.email) {
+      setUserEmail(user.email);
+    }
+  };
+
+  fetchUser();
+}, []);
+
   const userStats = {
     totalPoints: 2340,
     rank: 156,
@@ -38,8 +63,8 @@ export function Profile() {
     waterSaved: 234,
     plasticAvoided: 12.3,
     treesPlanted: 3,
-    level: 5,
-    nextLevelProgress: 65,
+    level: 1,
+    nextLevelProgress: 73,
   }
 
   const badges = [
@@ -82,17 +107,38 @@ export function Profile() {
     },
   ]
 
+  const impactSummaryRef = useRef<HTMLDivElement>(null)
+  const badgeCollectionRef = useRef<HTMLDivElement>(null)
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user?.id}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
 
-      const imageUrl = URL.createObjectURL(file)
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
 
-      setProfileData((prev) => ({
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user?.id)
+
+      if (updateError) throw updateError
+
+      setProfileData(prev => ({
         ...prev,
-        avatar: imageUrl,
+        avatar: publicUrl
       }))
 
       toast({
@@ -112,8 +158,19 @@ export function Profile() {
 
   const handleSaveChanges = async () => {
     setLoading(true)
-
     try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: profileData.name,
+          email: profileData.email,
+          bio: profileData.bio,
+          location: profileData.location
+        })
+        .eq('id', user?.id)
+
+      if (error) throw error
+
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
@@ -131,6 +188,171 @@ export function Profile() {
     }
   }
 
+  const handleDownloadData = async () => {
+    setDownloadingData(true)
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single()
+
+      const { data: challenges, error: challengesError } = await supabase
+        .from('user_challenges')
+        .select('*')
+        .eq('user_id', user?.id)
+
+      const { data: badges, error: badgesError } = await supabase
+        .from('user_badges')
+        .select('*')
+        .eq('user_id', user?.id)
+
+      if (profileError || challengesError || badgesError) {
+        throw new Error(profileError?.message || challengesError?.message || badgesError?.message)
+      }
+
+      const userData = {
+        profile,
+        stats: userStats,
+        challenges,
+        badges,
+        settings: {
+        },
+        downloadedAt: new Date().toISOString()
+      }
+
+      const blob = new Blob([JSON.stringify(userData, null, 2)], {
+        type: 'application/json'
+      })
+      const url = URL.createObjectURL(blob)
+
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `greengrid-data-${user?.id}-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Data Downloaded",
+        description: "Your user data has been downloaded successfully.",
+        variant: "success",
+      })
+    } catch (error: any) {
+      console.error('Data download error:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to download user data",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingData(false)
+    }
+  }
+
+  const shareToInstagramStory = async (imageUrl: string) => {
+    try {
+      const link = document.createElement('a')
+      link.href = imageUrl
+      link.download = 'greengrid-impact.png'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast({
+        title: "Ready for Instagram!",
+        description: "Image saved - open Instagram to share to your story",
+        variant: "default",
+        action: (
+          <Button 
+            variant="outline" 
+            onClick={() => window.open('instagram://story', '_blank')}
+          >
+            Open Instagram
+          </Button>
+        ),
+        duration: 10000
+      })
+    } catch (error) {
+      console.error('Error sharing to Instagram:', error)
+      toast({
+        title: "Error",
+        description: "Could not prepare image for Instagram",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const generateShareImage = async (ref: React.RefObject<HTMLDivElement>) => {
+    if (!ref.current) {
+      toast({
+        title: "Error",
+        description: "Could not generate shareable image",
+        variant: "destructive",
+      })
+      return null
+    }
+
+    try {
+      return await toPng(ref.current, {
+        backgroundColor: '#ffffff',
+        quality: 1,
+        pixelRatio: 2,
+        style: {
+          borderRadius: '12px',
+          padding: '20px'
+        }
+      })
+    } catch (error) {
+      console.error('Error generating image:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create shareable image",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
+
+  const handleShare = async (type: 'impact' | 'badges', platform: string) => {
+    const ref = type === 'impact' ? impactSummaryRef : badgeCollectionRef
+    const shareText = type === 'impact' 
+      ? `Check out my eco impact! 🌱\n${userStats.challengesCompleted} challenges\n${userStats.totalPoints} points\nRank #${userStats.rank}\n${badges.filter(b => b.earned).length} badges\n#GreenGrid`
+      : `My eco badges! 🏆\n${badges.filter(b => b.earned).map(b => `${b.name} (${b.rarity})`).join('\n')}\n#GreenGrid`
+
+    if (platform === 'instagram') {
+      const imageUrl = await generateShareImage(ref)
+      if (imageUrl) {
+        await shareToInstagramStory(imageUrl)
+      }
+      return
+    }
+
+    if (platform === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+      return
+    }
+
+    if (platform === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(shareText)}`, '_blank')
+      return
+    }
+
+    if (platform === 'twitter') {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`, '_blank')
+      return
+    }
+
+    navigator.clipboard.writeText(shareText)
+    toast({
+      title: "Copied to clipboard",
+      description: "Share content is ready to paste",
+      variant: "default",
+    })
+  }
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
@@ -141,6 +363,7 @@ export function Profile() {
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
+        {/* Profile Tab Content */}
         <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardHeader>
@@ -169,7 +392,7 @@ export function Profile() {
                   </Button>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">{user?.name || "Salman Khan"}</h3>
+                  <h3 className="text-xl font-semibold">{profileData.name}</h3>
                   <p className="text-gray-600">Eco Warrior since March 2024</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge className="bg-green-100 text-green-800">Level {userStats.level} - Climate Champion</Badge>
@@ -186,21 +409,21 @@ export function Profile() {
                   <div>
                     <label className="block text-sm font-medium mb-1">Full Name</label>
                     <Input
-                      defaultValue={profileData.name}
+                      value={profileData.name}
                       onChange={(e) => setProfileData((prev) => ({ ...prev, name: e.target.value }))}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Email</label>
                     <Input
-                      defaultValue={profileData.email}
+                      value={profileData.email}
                       onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Location</label>
                     <Select
-                      defaultValue={profileData.location}
+                      value={profileData.location}
                       onValueChange={(value) => setProfileData((prev) => ({ ...prev, location: value }))}
                     >
                       <SelectTrigger>
@@ -219,7 +442,7 @@ export function Profile() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Team</label>
-                    <Select defaultValue="ecowarriors">
+                    <Select value="ecowarriors">
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -234,7 +457,7 @@ export function Profile() {
                     <label className="block text-sm font-medium mb-1">Bio</label>
                     <Textarea
                       placeholder="Tell us about your eco journey..."
-                      defaultValue={profileData.bio}
+                      value={profileData.bio}
                       onChange={(e) => setProfileData((prev) => ({ ...prev, bio: e.target.value }))}
                       rows={4}
                     />
@@ -251,10 +474,32 @@ export function Profile() {
             </CardContent>
           </Card>
 
-          {/* Impact Summary */}
-          <Card>
+          <Card ref={impactSummaryRef}>
             <CardHeader>
-              <CardTitle>Your Impact Summary</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>Your Impact Summary</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Share2 className="h-4 w-4 mr-2" /> Share
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleShare('impact', 'whatsapp')}>
+                      <FaWhatsapp className="mr-2 text-green-500" /> WhatsApp
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('impact', 'facebook')}>
+                      <FaFacebook className="mr-2 text-blue-600" /> Facebook
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('impact', 'x')}>
+                      <FaXTwitter className="mr-2 text-black-400" /> X
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('impact', 'instagram')}>
+                      <FaInstagram className="mr-2 text-pink-600" /> Instagram Story
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -279,13 +524,37 @@ export function Profile() {
           </Card>
         </TabsContent>
 
+        {/* Achievements Tab Content */}
         <TabsContent value="achievements" className="space-y-6">
-          <Card>
+          <Card ref={badgeCollectionRef}>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Award className="h-5 w-5 text-yellow-600" />
-                <span>Badge Collection</span>
-              </CardTitle>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <Award className="h-5 w-5 text-yellow-600" />
+                  <span>Badge Collection</span>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Share2 className="h-4 w-4 mr-2" /> Share
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleShare('badges', 'whatsapp')}>
+                      <FaWhatsapp className="mr-2 text-green-500" /> WhatsApp
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('badges', 'facebook')}>
+                      <FaFacebook className="mr-2 text-blue-600" /> Facebook
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('badges', 'x')}>
+                      <FaXTwitter className="mr-2 text-blue-400" /> X
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleShare('badges', 'instagram')}>
+                      <FaInstagram className="mr-2 text-pink-600" /> Instagram Story
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <CardDescription>Collect badges by completing challenges and eco-actions</CardDescription>
             </CardHeader>
             <CardContent>
@@ -325,6 +594,7 @@ export function Profile() {
           </Card>
         </TabsContent>
 
+        {/* History Tab Content */}
         <TabsContent value="history" className="space-y-6">
           <Card>
             <CardHeader>
@@ -360,6 +630,7 @@ export function Profile() {
           </Card>
         </TabsContent>
 
+        {/* Settings Tab Content */}
         <TabsContent value="settings" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
@@ -430,8 +701,13 @@ export function Profile() {
                 <Button variant="outline" className="w-full">
                   Two-Factor Authentication
                 </Button>
-                <Button variant="outline" className="w-full">
-                  Download Data
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={handleDownloadData}
+                  disabled={downloadingData}
+                >
+                  {downloadingData ? "Preparing Data..." : "Download Data"}
                 </Button>
                 <Button variant="destructive" className="w-full">
                   Delete Account
@@ -447,20 +723,62 @@ export function Profile() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full">
+                {/* <Button variant="outline" className="w-full">Add commentMore actions
                   Help Center
+                </Button> */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setIsHelpCenterOpen(true)}
+                >
+                Help Center
                 </Button>
-                <Button variant="outline" className="w-full">
-                  Contact Support
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Report a Bug
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Feature Request
-                </Button>
+
+                <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                setEmailSubject('Bug Report');
+                setMailModalOpen(true);
+              }}
+              >
+              Report a Bug
+              </Button>
+
+              <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+              setEmailSubject('Feature Request');
+              setMailModalOpen(true);
+              }}
+              >
+              Feature Request
+              </Button>
+
+            <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+            setEmailSubject('Contact Support');
+            setMailModalOpen(true);
+            }}
+            >
+            Contact Support
+            </Button>
               </CardContent>
             </Card>
+            <HelpCenterModal
+            isOpen={isHelpCenterOpen}
+            onRequestClose={() => setIsHelpCenterOpen(false)}
+            />
+            <MailModal
+            isOpen={mailModalOpen}
+            onRequestClose={() => setMailModalOpen(false)}
+            recipient="greengrid.care@gmail.com"
+            subject={emailSubject}
+            sender={userEmail}
+            />
           </div>
         </TabsContent>
       </Tabs>
