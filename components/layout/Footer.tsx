@@ -136,7 +136,7 @@ export function Footer() {
                   Contact Us
                 </span>
                 <p className="block text-white dark:text-green-400">
-                  admin@greengrid.com
+                  greengrid.care@gmail.com
                 </p>
                 <p className="block text-white dark:text-green-400">+91 9999XXXXXX</p>
               </li>
