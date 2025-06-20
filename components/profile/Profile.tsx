@@ -18,10 +18,23 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useApp } from "@/app/providers"
-import { supabase } from '@/lib/supabase' // Import Supabase client
+import { supabase } from '@/lib/supabase'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 export function Profile() {
   const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [activeTab, setActiveTab] = useState("profile")
   const { user } = useApp()
@@ -38,22 +51,22 @@ export function Profile() {
     avatar: user?.avatar_url || "/placeholder.svg",
   })
 
-const supabase = createClientComponentClient();
-const [userEmail, setUserEmail] = useState('');
+  const supabase = createClientComponentClient();
+  const [userEmail, setUserEmail] = useState('');
 
-useEffect(() => {
-  const fetchUser = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    if (user?.email) {
-      setUserEmail(user.email);
-    }
-  };
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
 
-  fetchUser();
-}, []);
+    fetchUser();
+  }, []);
 
   const userStats = {
     totalPoints: 2340,
@@ -252,6 +265,53 @@ useEffect(() => {
     }
   }
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords don't match");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      const { data: user, error: authError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      });
+
+      if (authError) {
+        throw authError;
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setPasswordSuccess("Password updated successfully!");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      setTimeout(() => {
+        setPasswordModalOpen(false);
+      }, 2000);
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      setPasswordError(error.message || "Failed to update password");
+    }
+  };
+
   const shareToInstagramStory = async (imageUrl: string) => {
     try {
       const link = document.createElement('a')
@@ -355,6 +415,79 @@ useEffect(() => {
 
   return (
     <div className="space-y-6">
+      {/* Password Change Modal */}
+      <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and set a new one.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label htmlFor="currentPassword" className="block text-sm font-medium mb-1">
+                Current Password
+              </label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="newPassword" className="block text-sm font-medium mb-1">
+                New Password
+              </label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-1">
+                Confirm New Password
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+            
+            {passwordError && (
+              <div className="text-red-600 text-sm">{passwordError}</div>
+            )}
+            
+            {passwordSuccess && (
+              <div className="text-green-600 text-sm">{passwordSuccess}</div>
+            )}
+            
+            <div className="flex justify-end space-x-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setPasswordModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                Change Password
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -695,7 +828,11 @@ useEffect(() => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setPasswordModalOpen(true)}
+                >
                   Change Password
                 </Button>
                 <Button variant="outline" className="w-full">
@@ -723,61 +860,58 @@ useEffect(() => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* <Button variant="outline" className="w-full">Add commentMore actions
-                  Help Center
-                </Button> */}
                 <Button
                   variant="outline"
                   className="w-full"
                   onClick={() => setIsHelpCenterOpen(true)}
                 >
-                Help Center
+                  Help Center
                 </Button>
 
                 <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                setEmailSubject('Bug Report');
-                setMailModalOpen(true);
-              }}
-              >
-              Report a Bug
-              </Button>
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setEmailSubject('Bug Report');
+                    setMailModalOpen(true);
+                  }}
+                >
+                  Report a Bug
+                </Button>
 
-              <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-              setEmailSubject('Feature Request');
-              setMailModalOpen(true);
-              }}
-              >
-              Feature Request
-              </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setEmailSubject('Feature Request');
+                    setMailModalOpen(true);
+                  }}
+                >
+                  Feature Request
+                </Button>
 
-            <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-            setEmailSubject('Contact Support');
-            setMailModalOpen(true);
-            }}
-            >
-            Contact Support
-            </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setEmailSubject('Contact Support');
+                    setMailModalOpen(true);
+                  }}
+                >
+                  Contact Support
+                </Button>
               </CardContent>
             </Card>
             <HelpCenterModal
-            isOpen={isHelpCenterOpen}
-            onRequestClose={() => setIsHelpCenterOpen(false)}
+              isOpen={isHelpCenterOpen}
+              onRequestClose={() => setIsHelpCenterOpen(false)}
             />
             <MailModal
-            isOpen={mailModalOpen}
-            onRequestClose={() => setMailModalOpen(false)}
-            recipient="greengrid.care@gmail.com"
-            subject={emailSubject}
-            sender={userEmail}
+              isOpen={mailModalOpen}
+              onRequestClose={() => setMailModalOpen(false)}
+              recipient="greengrid.care@gmail.com"
+              subject={emailSubject}
+              sender={userEmail}
             />
           </div>
         </TabsContent>
