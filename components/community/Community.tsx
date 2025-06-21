@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { motion, AnimatePresence, Variants } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,9 +17,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Plus, MessageSquare, Calendar, Share2, Heart, Send, MapPin } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
-
+import { toast } from "react-hot-toast";
+import { useToast } from "@/hooks/use-toast"
+const MotionCard = motion(Card)
+const MotionDiv = motion.div
+const MotionButton = motion(Button)
 export function Community() {
+  const { toast } = useToast();
   const [newPostOpen, setNewPostOpen] = useState(false)
   const [postContent, setPostContent] = useState("")
   const [activeCategory, setActiveCategory] = useState("all")
@@ -470,7 +475,18 @@ export function Community() {
                     <span>{event.location}</span>
                   </div>
                 </div>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() =>
+                    toast({
+                      title: "Coming Soon!",
+                      description: "Stay tuned for event participation.",
+                      className:
+                        "bg-green-50 text-green-800 border border-green-200 shadow-md rounded-lg p-4",
+                    })
+                  }
+                >
                   Join Event
                 </Button>
               </div>
