@@ -15,6 +15,7 @@ import {
   ChevronRight,
   MessageSquare,
   FileCheck,
+  Gift,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -59,6 +60,11 @@ export function AdminSidebar() {
       title: "Challenges",
       href: "/admin/challenges",
       icon: <Award className="h-5 w-5" />,
+    },
+    {
+      title: "Rewards",
+      href: "/admin/rewards",
+      icon: <Gift className="h-5 w-5" />,
     },
     {
       title: "Teams",

@@ -6,9 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useApp } from "@/app/providers"
-import { Coins, TreePine, Star, Award, TrendingUp, Check, Copy, Loader2 } from "lucide-react"
+import { Coins, TreePine, Star, Award, TrendingUp, Check, Copy, Loader2, Share2, Download, MessageCircle, Link } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { QRModal } from "@/components/wallet/QRModal"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import html2canvas from "html2canvas"
+import jsPDF from "jspdf"
 
 interface Reward {
   id: string
@@ -58,6 +66,7 @@ export function EcoWallet() {
   const [recentTransactions, setRecentTransactions] = useState<UserActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [redeeming, setRedeeming] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
   const { user, supabase } = useApp()
 
   useEffect(() => {
@@ -269,6 +278,147 @@ export function EcoWallet() {
     return `${Math.floor(diffDays / 30)} months ago`
   }
 
+  const handleShare = async (type: 'pdf' | 'whatsapp' | 'link' | 'image') => {
+    if (!user) return
+
+    setSharing(true)
+    try {
+      switch (type) {
+        case 'pdf':
+          await downloadAsPDF()
+          break
+        case 'whatsapp':
+          await shareViaWhatsApp()
+          break
+        case 'link':
+          await copyLink()
+          break
+        case 'image':
+          await downloadAsImage()
+          break
+      }
+    } catch (error) {
+      console.error('Share error:', error)
+      toast({
+        title: "Error",
+        description: "Failed to share transactions",
+        variant: "destructive",
+      })
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const downloadAsPDF = async () => {
+    if (!user) return
+    
+    const element = document.getElementById('transactions-section')
+    if (!element) return
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const imgWidth = 210
+    const pageHeight = 295
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    let heightLeft = imgHeight
+
+    let position = 0
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+
+    pdf.save(`eco-wallet-transactions-${user.name}-${new Date().toISOString().split('T')[0]}.pdf`)
+
+    toast({
+      title: "PDF Downloaded",
+      description: "Your transaction history has been downloaded as PDF",
+    })
+  }
+
+  const shareViaWhatsApp = async () => {
+    if (!user) return
+    
+    const text = generateShareText()
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`
+    window.open(url, '_blank')
+    
+    toast({
+      title: "WhatsApp Share",
+      description: "Opening WhatsApp to share your transactions",
+    })
+  }
+
+  const copyLink = async () => {
+    if (!user) return
+    
+    const shareUrl = `${window.location.origin}/ecowallet?user=${user.id}`
+    await navigator.clipboard.writeText(shareUrl)
+    
+    toast({
+      title: "Link Copied",
+      description: "Wallet link copied to clipboard",
+    })
+  }
+
+  const downloadAsImage = async () => {
+    if (!user) return
+    
+    const element = document.getElementById('transactions-section')
+    if (!element) return
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    })
+
+    const link = document.createElement('a')
+    link.download = `eco-wallet-transactions-${user.name}-${new Date().toISOString().split('T')[0]}.png`
+    link.href = canvas.toDataURL()
+    link.click()
+
+    toast({
+      title: "Image Downloaded",
+      description: "Your transaction history has been downloaded as image",
+    })
+  }
+
+  const generateShareText = () => {
+    const totalPoints = user?.total_points || 0
+    const transactionCount = recentTransactions.length
+    const earnedPoints = recentTransactions
+      .filter(t => t.points_earned > 0)
+      .reduce((sum, t) => sum + t.points_earned, 0)
+    const spentPoints = Math.abs(recentTransactions
+      .filter(t => t.points_earned < 0)
+      .reduce((sum, t) => sum + t.points_earned, 0))
+
+    return `🌱 My GreenGrid EcoWallet Summary:
+
+💰 Total EcoPoints: ${totalPoints}
+📊 Recent Transactions: ${transactionCount}
+✅ Points Earned: +${earnedPoints}
+💸 Points Spent: -${spentPoints}
+
+Join me in making the world greener! 🌍
+Check out GreenGrid: ${window.location.origin}`
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -440,11 +590,67 @@ export function EcoWallet() {
       </Tabs>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Transactions</CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={sharing} className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100">
+                {sharing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
+                )}
+                <span className="ml-2">Share</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleShare('pdf')}>
+                <Download className="h-4 w-4 mr-2" />
+                Download as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('image')}>
+                <Download className="h-4 w-4 mr-2" />
+                Download as Image
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('whatsapp')}>
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Share via WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('link')}>
+                <Link className="h-4 w-4 mr-2" />
+                Copy Link
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div id="transactions-section" className="space-y-3">
+            {/* Summary Section */}
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-green-700">{user?.total_points || 0}</div>
+                  <div className="text-sm text-green-600">Total Points</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-700">{recentTransactions.length}</div>
+                  <div className="text-sm text-blue-600">Transactions</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    +{recentTransactions.filter(t => t.points_earned > 0).reduce((sum, t) => sum + t.points_earned, 0)}
+                  </div>
+                  <div className="text-sm text-green-600">Earned</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-600">
+                    -{Math.abs(recentTransactions.filter(t => t.points_earned < 0).reduce((sum, t) => sum + t.points_earned, 0))}
+                  </div>
+                  <div className="text-sm text-red-600">Spent</div>
+                </div>
+              </div>
+            </div>
+            
             {recentTransactions.length === 0 ? (
               <p className="text-center text-gray-500 py-4">No recent transactions</p>
             ) : (
