@@ -20,8 +20,6 @@ import { Camera, Upload, Calendar, MapPin } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/app/providers"
 import { toast } from "react-hot-toast";
-
-
 const MotionCard = motion(Card)
 const MotionDiv = motion.div
 const MotionButton = motion(Button)
