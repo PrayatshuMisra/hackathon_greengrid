@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,11 +13,83 @@ import { QRModal } from "@/components/wallet/QRModal";
 export function EcoWallet() {
   const [activeTab, setActiveTab] = useState("donations")
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
-  const { user } = useApp()
+  const { user, supabase } = useApp()
+  const [loading, setLoading] = useState(true)
 
   const [userStats, setUserStats] = useState({
-    totalPoints: 2340,
+    totalPoints: 0,
   })
+
+  const [rewards, setRewards] = useState<any[]>([])
+  const [userRewards, setUserRewards] = useState<any[]>([])
+  const [userActivity, setUserActivity] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+      
+      setLoading(true);
+      try {
+        // Fetch user's current points
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("total_points")
+          .eq("id", user.id)
+          .single();
+        
+        if (profileError) throw profileError;
+        
+        setUserStats({
+          totalPoints: profile.total_points || 0,
+        });
+
+        // Fetch available rewards
+        const { data: rewardsData, error: rewardsError } = await supabase
+          .from("rewards")
+          .select("*")
+          .eq("is_active", true)
+          .order("points_cost", { ascending: true });
+        
+        if (rewardsError) throw rewardsError;
+        setRewards(rewardsData || []);
+
+        // Fetch user's redeemed rewards
+        const { data: userRewardsData, error: userRewardsError } = await supabase
+          .from("user_rewards")
+          .select("*, rewards(name, category)")
+          .eq("user_id", user.id)
+          .order("redeemed_at", { ascending: false });
+        
+        if (userRewardsError) throw userRewardsError;
+        setUserRewards(userRewardsData || []);
+
+        // Fetch user activity for earned points
+        const { data: activityData, error: activityError } = await supabase
+          .from("user_activity")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("activity_type", ["challenge", "event", "badge"])
+          .gte("points_earned", 0)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        
+        if (activityError) throw activityError;
+        setUserActivity(activityData || []);
+
+      } catch (error) {
+        console.error("Error fetching wallet data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load wallet data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.id, supabase]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
@@ -26,22 +98,69 @@ export function EcoWallet() {
   }
 
   const redeemReward = async (reward: any) => {
+    if (!user?.id) {
+      toast({
+        title: "Not logged in",
+        description: "Please log in to redeem rewards",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      if (userStats.totalPoints < reward.cost) {
+      if (userStats.totalPoints < reward.points_cost) {
         toast({
           title: "Insufficient Points",
-          description: `You need ${reward.cost - userStats.totalPoints} more points to redeem this reward.`,
+          description: `You need ${reward.points_cost - userStats.totalPoints} more points to redeem this reward.`,
           variant: "destructive",
         })
         return
       }
 
-      const redemptionCode = Math.random().toString(36).substring(2, 10).toUpperCase()
+      // Generate redemption code
+      const redemptionCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-      setUserStats((prev) => ({
+      // Insert into user_rewards table
+      const { data: userReward, error: insertError } = await supabase
+        .from("user_rewards")
+        .insert({
+          user_id: user.id,
+          reward_id: reward.id,
+          points_spent: reward.points_cost,
+          redemption_code: redemptionCode,
+          expires_at: new Date(Date.now() + (reward.validity_days || 365) * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Update user's points
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ total_points: userStats.totalPoints - reward.points_cost })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setUserStats(prev => ({
         ...prev,
-        totalPoints: prev.totalPoints - reward.cost,
-      }))
+        totalPoints: prev.totalPoints - reward.points_cost,
+      }));
+
+      // Add to user rewards list
+      setUserRewards(prev => [userReward, ...prev]);
+
+      // Log activity
+      await supabase.from("user_activity").insert({
+        user_id: user.id,
+        activity_type: "reward",
+        description: `Redeemed reward: ${reward.name}`,
+        points_earned: -reward.points_cost,
+        related_id: reward.id,
+        related_type: "reward",
+      });
 
       toast({
         title: "Reward Redeemed!",
@@ -59,6 +178,41 @@ export function EcoWallet() {
     }
   }
 
+  const getRewardsByCategory = (category: string) => {
+    return rewards.filter(reward => reward.category === category);
+  };
+
+  const formatTransaction = (userReward: any) => {
+    const reward = userReward.rewards;
+    return {
+      type: "redeemed",
+      action: `Redeemed ${reward.name}`,
+      points: -userReward.points_spent,
+      date: new Date(userReward.redeemed_at).toLocaleDateString(),
+      code: userReward.redemption_code,
+      timestamp: new Date(userReward.redeemed_at).getTime(),
+    };
+  };
+
+  const formatActivityTransaction = (activity: any) => {
+    return {
+      type: "earned",
+      action: activity.description,
+      points: activity.points_earned,
+      date: new Date(activity.created_at).toLocaleDateString(),
+      timestamp: new Date(activity.created_at).getTime(),
+      code: undefined,
+    };
+  };
+
+  const getCombinedTransactions = () => {
+    const redeemedTransactions = userRewards.map(formatTransaction);
+    const earnedTransactions = userActivity.map(formatActivityTransaction);
+    
+    const combined = [...redeemedTransactions, ...earnedTransactions];
+    return combined.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -68,7 +222,7 @@ export function EcoWallet() {
         </div>
         <Card className="p-4 bg-gradient-to-r from-green-100 to-blue-100">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-700">{userStats.totalPoints}</div>
+            <div className="text-2xl font-bold text-green-700">{userStats.totalPoints.toLocaleString()}</div>
             <div className="text-sm text-green-600">Available EcoPoints</div>
           </div>
         </Card>
@@ -84,25 +238,21 @@ export function EcoWallet() {
 
         <TabsContent value="donations" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: "Plant 1 Tree", cost: 100, impact: "1 tree planted", org: "Green India Foundation" },
-              { name: "Plant 5 Trees", cost: 450, impact: "5 trees planted", org: "Forest Revival NGO" },
-              { name: "Mangrove Restoration", cost: 200, impact: "2 mangroves planted", org: "Coastal Care" },
-              { name: "Urban Forest", cost: 800, impact: "10 saplings", org: "City Green Initiative" },
-            ].map((donation, index) => (
-              <Card key={index} className="border-green-200 hover:shadow-md transition-shadow">
+            {getRewardsByCategory("donation").map((donation, index) => (
+              <Card key={donation.id} className="border-green-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-3">
                     <TreePine className="h-5 w-5 text-green-600" />
                     <h3 className="font-semibold">{donation.name}</h3>
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">by {donation.org}</p>
-                  <p className="text-sm text-green-600 mb-3">Impact: {donation.impact}</p>
+                  <p className="text-sm text-gray-600 mb-2">by {donation.brand}</p>
+                  <p className="text-sm text-green-600 mb-3">{donation.description}</p>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-green-700">{donation.cost} pts</span>
+                    <span className="font-bold text-green-700">{donation.points_cost} pts</span>
                     <QRModal
-                      qrImageSrc="/qr/meme-reward.jpg"
-                      disabled={userStats.totalPoints < donation.cost}
+                      rewardName={donation.name}
+                      redemptionCode={donation.id}
+                      disabled={userStats.totalPoints < donation.points_cost}
                       onRedeem={() => redeemReward(donation)}
                     />
                   </div>
@@ -114,43 +264,41 @@ export function EcoWallet() {
 
         <TabsContent value="coupons" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: "Organic Store 20% Off", cost: 300, brand: "Nature's Basket", validity: "30 days", code: "ECO20" },
-              { name: "Solar Panel 15% Discount", cost: 1500, brand: "SunPower India", validity: "60 days", code: "SOLAR15" },
-              { name: "Electric Vehicle Test Drive", cost: 200, brand: "Tata Motors", validity: "15 days", code: "EVDRIVE" },
-              { name: "Eco-Friendly Clothing 25% Off", cost: 400, brand: "Sustainable Fashion Co.", validity: "45 days", code: "GREEN25" },
-            ].map((coupon, index) => (
-              <Card key={index} className="border-blue-200 hover:shadow-md transition-shadow">
+            {getRewardsByCategory("coupon").map((coupon, index) => (
+              <Card key={coupon.id} className="border-blue-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-3">
                     <Coins className="h-5 w-5 text-blue-600" />
                     <h3 className="font-semibold">{coupon.name}</h3>
                   </div>
                   <p className="text-sm text-gray-600 mb-2">by {coupon.brand}</p>
-                  <p className="text-sm text-blue-600 mb-3">Valid for {coupon.validity}</p>
+                  <p className="text-sm text-blue-600 mb-3">Valid for {coupon.validity_days} days</p>
                   <div className="flex justify-between items-center mb-3">
-                    <span className="font-bold text-blue-700">{coupon.cost} pts</span>
+                    <span className="font-bold text-blue-700">{coupon.points_cost} pts</span>
                     <QRModal
-                      qrImageSrc="/qr/meme-reward.jpg"
-                      disabled={userStats.totalPoints < coupon.cost}
+                      rewardName={coupon.name}
+                      redemptionCode={coupon.id}
+                      disabled={userStats.totalPoints < coupon.points_cost}
                       onRedeem={() => redeemReward(coupon)}
                     />
                   </div>
-                  <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                    <code className="text-sm font-mono">{coupon.code}</code>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleCopyCode(coupon.code)}
-                      className="h-6 w-6 p-0"
-                    >
-                      {copiedCode === coupon.code ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </div>
+                  {coupon.coupon_code && (
+                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                      <code className="text-sm font-mono">{coupon.coupon_code}</code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleCopyCode(coupon.coupon_code)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {copiedCode === coupon.coupon_code ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <Copy className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -159,13 +307,8 @@ export function EcoWallet() {
 
         <TabsContent value="products" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: "Bamboo Water Bottle", cost: 600, description: "Sustainable hydration solution" },
-              { name: "Solar Power Bank", cost: 1200, description: "Charge devices with solar energy" },
-              { name: "Organic Seed Kit", cost: 300, description: "Grow your own vegetables" },
-              { name: "Eco-Friendly Notebook", cost: 150, description: "Made from recycled paper" },
-            ].map((product, index) => (
-              <Card key={index} className="border-orange-200 hover:shadow-md transition-shadow">
+            {getRewardsByCategory("product").map((product, index) => (
+              <Card key={product.id} className="border-orange-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-3">
                     <Star className="h-5 w-5 text-orange-600" />
@@ -173,10 +316,11 @@ export function EcoWallet() {
                   </div>
                   <p className="text-sm text-gray-600 mb-3">{product.description}</p>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-orange-700">{product.cost} pts</span>
+                    <span className="font-bold text-orange-700">{product.points_cost} pts</span>
                     <QRModal
-                      qrImageSrc="/qr/meme-reward.jpg"
-                      disabled={userStats.totalPoints < product.cost}
+                      rewardName={product.name}
+                      redemptionCode={product.id}
+                      disabled={userStats.totalPoints < product.points_cost}
                       onRedeem={() => redeemReward(product)}
                     />
                   </div>
@@ -188,25 +332,20 @@ export function EcoWallet() {
 
         <TabsContent value="nfts" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: "Climate Hero Badge", cost: 500, rarity: "Rare", description: "Digital achievement badge" },
-              { name: "Eco Warrior Certificate", cost: 800, rarity: "Epic", description: "Verified eco-action certificate" },
-              { name: "Green Champion Trophy", cost: 1000, rarity: "Legendary", description: "Ultimate eco-achievement" },
-              { name: "Planet Protector Emblem", cost: 350, rarity: "Common", description: "Show your commitment" },
-            ].map((nft, index) => (
-              <Card key={index} className="border-purple-200 hover:shadow-md transition-shadow">
+            {getRewardsByCategory("nft").map((nft, index) => (
+              <Card key={nft.id} className="border-purple-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2 mb-3">
                     <Award className="h-5 w-5 text-purple-600" />
                     <h3 className="font-semibold">{nft.name}</h3>
                   </div>
-                  <Badge variant="outline" className="mb-2">{nft.rarity}</Badge>
                   <p className="text-sm text-gray-600 mb-3">{nft.description}</p>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-purple-700">{nft.cost} pts</span>
+                    <span className="font-bold text-purple-700">{nft.points_cost} pts</span>
                     <QRModal
-                      qrImageSrc="/qr/meme-reward.jpg"
-                      disabled={userStats.totalPoints < nft.cost}
+                      rewardName={nft.name}
+                      redemptionCode={nft.id}
+                      disabled={userStats.totalPoints < nft.points_cost}
                       onRedeem={() => redeemReward(nft)}
                     />
                   </div>
@@ -223,36 +362,40 @@ export function EcoWallet() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[
-              { type: "earned", action: "Completed Plastic-Free Week", points: 150, date: "2 days ago" },
-              { type: "redeemed", action: "Planted 1 Tree", points: -100, date: "5 days ago" },
-              { type: "earned", action: "Bike Commute Challenge", points: 200, date: "1 week ago" },
-              { type: "redeemed", action: "Organic Store Coupon", points: -300, date: "2 weeks ago" },
-            ].map((transaction, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      transaction.type === "earned" ? "bg-green-100" : "bg-red-100"
-                    }`}
-                  >
-                    {transaction.type === "earned" ? (
-                      <TrendingUp className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Coins className="h-4 w-4 text-red-600" />
-                    )}
+            {getCombinedTransactions().length > 0 ? (
+              getCombinedTransactions().map((transaction, index) => {
+                return (
+                  <div key={transaction.timestamp} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        transaction.type === "earned" ? "bg-green-100" : "bg-red-100"
+                      }`}>
+                        {transaction.type === "earned" ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Coins className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{transaction.action}</p>
+                        <p className="text-xs text-gray-500">{transaction.date}</p>
+                        {transaction.code && (
+                          <p className="text-xs text-blue-600">Code: {transaction.code}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`font-bold ${transaction.type === "earned" ? "text-green-600" : "text-red-600"}`}>
+                      {transaction.points > 0 ? "+" : ""}
+                      {transaction.points} pts
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{transaction.action}</p>
-                    <p className="text-xs text-gray-500">{transaction.date}</p>
-                  </div>
-                </div>
-                <div className={`font-bold ${transaction.type === "earned" ? "text-green-600" : "text-red-600"}`}>
-                  {transaction.points > 0 ? "+" : ""}
-                  {transaction.points} pts
-                </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                No transactions yet. Start earning points to redeem rewards!
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>

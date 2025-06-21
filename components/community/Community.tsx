@@ -34,7 +34,6 @@ import {
   Copy,
   Pin,
 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
 import { useApp } from "@/app/providers";
 
 type Comment = {
@@ -87,9 +86,11 @@ type ExpandedPostState = {
 
 export function Community() {
   const { supabase, user } = useApp();
+  const { toast } = useToast();
   const [forumPosts, setForumPosts] = useState<Post[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [likedComments, setLikedComments] = useState<string[]>([]);
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [postTitle, setPostTitle] = useState("");
   const [postContent, setPostContent] = useState("");
@@ -228,22 +229,33 @@ export function Community() {
     fetchPostsWithCategoryFilter(categoryId);
   };
 
-  // Fetch user's liked posts
-  const fetchLikedPosts = async () => {
+  // Fetch user's liked posts and comments
+  const fetchLikedContent = async () => {
     if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch liked posts
+      const { data: likedPostsData, error: postsError } = await supabase
         .from("forum_likes")
         .select("post_id")
         .eq("user_id", user.id)
         .is("reply_id", null);
 
-      if (error) throw error;
+      if (postsError) throw postsError;
 
-      setLikedPosts(data.map((like: { post_id: string }) => like.post_id));
+      // Fetch liked comments
+      const { data: likedCommentsData, error: commentsError } = await supabase
+        .from("forum_likes")
+        .select("reply_id")
+        .eq("user_id", user.id)
+        .not("reply_id", "is", null);
+
+      if (commentsError) throw commentsError;
+
+      setLikedPosts(likedPostsData.map((like: { post_id: string }) => like.post_id));
+      setLikedComments(likedCommentsData.map((like: { reply_id: string }) => like.reply_id));
     } catch (error) {
-      console.error("Error fetching liked posts:", error);
+      console.error("Error fetching liked content:", error);
     }
   };
 
@@ -310,6 +322,9 @@ export function Community() {
     const expandedPost = expandedPosts.find((p) => p.postId === postId);
     if (!expandedPost || !expandedPost.newComment.trim()) return;
 
+    const commentContent = expandedPost.newComment.trim();
+    const post = forumPosts.find(p => p.id === postId);
+
     // Create temporary comment for optimistic update
     const tempCommentId = `temp-${Date.now()}`;
     const tempComment = {
@@ -318,13 +333,13 @@ export function Community() {
       author_id: user.id,
       author_name: user.user_metadata?.name || "You",
       avatar_url: user.user_metadata?.avatar_url || "",
-      content: expandedPost.newComment,
+      content: commentContent,
       like_count: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
-    // Optimistically update UI
+    // Optimistically update UI immediately
     setExpandedPosts((prev) =>
       prev.map((p) =>
         p.postId === postId
@@ -337,12 +352,12 @@ export function Community() {
       )
     );
 
-    // Optimistically update post count
+    // Optimistically update post reply count
     setForumPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? { ...post, reply_count: post.reply_count + 1 }
-          : post
+      prev.map((p) =>
+        p.id === postId
+          ? { ...p, reply_count: p.reply_count + 1 }
+          : p
       )
     );
 
@@ -352,12 +367,18 @@ export function Community() {
         .insert({
           post_id: postId,
           author_id: user.id,
-          content: expandedPost.newComment,
+          content: commentContent,
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // Update post reply count in database
+      await supabase
+        .from("forum_posts")
+        .update({ reply_count: (post?.reply_count || 0) + 1 })
+        .eq("id", postId);
 
       // Replace temporary comment with real data
       setExpandedPosts((prev) =>
@@ -380,6 +401,23 @@ export function Community() {
         )
       );
 
+      // Send notification to post author (if not the same user)
+      if (post && post.author_id !== user.id) {
+        await supabase.from("notifications").insert({
+          user_id: post.author_id,
+          title: "New Comment on Your Post",
+          message: `${user.user_metadata?.name || "A user"} commented on your post "${post.title}"`,
+          type: "badge",
+          is_read: false,
+          data: {
+            post_id: postId,
+            action: "comment",
+            commenter_name: user.user_metadata?.name || "A user",
+            comment_content: commentContent.substring(0, 50) + (commentContent.length > 50 ? "..." : "")
+          },
+        });
+      }
+
       toast({
         title: "Comment Added",
         description: "Your comment was posted successfully",
@@ -395,41 +433,43 @@ export function Community() {
             ? {
                 ...p,
                 comments: p.comments.filter((c) => c.id !== tempCommentId),
-                newComment: expandedPost.newComment,
+                newComment: commentContent,
               }
             : p
         )
       );
 
       setForumPosts((prev) =>
-        prev.map((post) =>
-          post.id === postId
-            ? { ...post, reply_count: Math.max(0, post.reply_count - 1) }
-            : post
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, reply_count: Math.max(0, p.reply_count - 1) }
+            : p
         )
       );
 
       toast({
         title: "Error",
-        description: "Failed to post comment",
+        description: "Failed to post comment. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  // Delete a comment
+  // Delete a comment with enhanced social media logic
   const handleDeleteComment = async (commentId: string) => {
     try {
-      // First get the post ID for this comment
+      // First get the post ID and comment details for this comment
       const { data: comment, error: fetchError } = await supabase
         .from("forum_replies")
-        .select("post_id")
+        .select("post_id, like_count")
         .eq("id", commentId)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Optimistically update UI
+      const post = forumPosts.find(p => p.id === comment.post_id);
+
+      // Optimistically update UI immediately
       setExpandedPosts((prev) =>
         prev.map((postState) => ({
           ...postState,
@@ -438,37 +478,54 @@ export function Community() {
       );
 
       setForumPosts((prev) =>
-        prev.map((post) =>
-          post.id === comment.post_id
-            ? { ...post, reply_count: Math.max(0, post.reply_count - 1) }
-            : post
+        prev.map((p) =>
+          p.id === comment.post_id
+            ? { ...p, reply_count: Math.max(0, p.reply_count - 1) }
+            : p
         )
       );
 
-      // Delete the comment
-      const { error } = await supabase
+      // Delete the comment from database
+      const { error: deleteError } = await supabase
         .from("forum_replies")
         .delete()
         .eq("id", commentId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Update post reply count in database
+      await supabase
+        .from("forum_posts")
+        .update({ reply_count: Math.max(0, (post?.reply_count || 1) - 1) })
+        .eq("id", comment.post_id);
+
+      // Delete associated likes for this comment
+      await supabase
+        .from("forum_likes")
+        .delete()
+        .eq("reply_id", commentId);
 
       toast({
         title: "Comment Deleted",
-        description: "Your comment was removed",
+        description: "Your comment was removed successfully",
         variant: "success",
       });
     } catch (error) {
       console.error("Error deleting comment:", error);
+      
+      // Rollback optimistic updates on error
+      fetchComments(commentId);
+      fetchPostsWithCategoryFilter(activeCategory);
+      
       toast({
         title: "Error",
-        description: (error as any).message || "Failed to delete comment",
+        description: "Failed to delete comment. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  // Like a comment
+  // Like a comment with enhanced social media logic
   const handleLikeComment = async (commentId: string) => {
     if (!user?.id) {
       toast({
@@ -494,7 +551,14 @@ export function Community() {
         p.comments.some((c) => c.id === commentId)
       )?.postId;
 
-      // Optimistically update UI
+      // Get the comment to find its author and current like count
+      const comment = expandedPosts
+        .find((p) => p.comments.some((c) => c.id === commentId))
+        ?.comments.find((c) => c.id === commentId);
+
+      const alreadyLiked = !!existingLike;
+
+      // Optimistically update UI immediately
       setExpandedPosts((prev) =>
         prev.map((postState) => {
           if (!postState.comments.some((c) => c.id === commentId))
@@ -502,20 +566,27 @@ export function Community() {
 
           return {
             ...postState,
-            comments: postState.comments.map((comment) => {
-              if (comment.id !== commentId) return comment;
+            comments: postState.comments.map((c) => {
+              if (c.id !== commentId) return c;
               return {
-                ...comment,
-                like_count: existingLike
-                  ? Math.max(0, comment.like_count - 1)
-                  : comment.like_count + 1,
+                ...c,
+                like_count: alreadyLiked
+                  ? Math.max(0, c.like_count - 1)
+                  : c.like_count + 1,
               };
             }),
           };
         })
       );
 
-      if (existingLike) {
+      // Update liked comments state
+      setLikedComments((prev) =>
+        alreadyLiked
+          ? prev.filter((id) => id !== commentId)
+          : [...prev, commentId]
+      );
+
+      if (alreadyLiked) {
         // Unlike the comment
         const { error: deleteError } = await supabase
           .from("forum_likes")
@@ -523,6 +594,13 @@ export function Community() {
           .eq("id", existingLike.id);
 
         if (deleteError) throw deleteError;
+
+        // Update comment like count in database
+        await supabase
+          .from("forum_replies")
+          .update({ like_count: Math.max(0, (comment?.like_count || 1) - 1) })
+          .eq("id", commentId);
+
       } else {
         // Like the comment
         const { error: insertError } = await supabase
@@ -533,19 +611,68 @@ export function Community() {
           });
 
         if (insertError) throw insertError;
+
+        // Update comment like count in database
+        await supabase
+          .from("forum_replies")
+          .update({ like_count: (comment?.like_count || 0) + 1 })
+          .eq("id", commentId);
+
+        // Send notification to comment author (if not the same user)
+        if (comment && comment.author_id !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: comment.author_id,
+            title: "New Like on Your Comment",
+            message: `${user.user_metadata?.name || "A user"} liked your comment`,
+            type: "badge",
+            is_read: false,
+            data: {
+              post_id: postId,
+              comment_id: commentId,
+              action: "comment_like",
+              liker_name: user.user_metadata?.name || "A user"
+            },
+          });
+        }
       }
     } catch (error) {
       console.error("Error liking comment:", error);
+      
+      // Rollback optimistic updates on error
+      setExpandedPosts((prev) =>
+        prev.map((postState) => {
+          if (!postState.comments.some((c) => c.id === commentId))
+            return postState;
+
+          return {
+            ...postState,
+            comments: postState.comments.map((c) => {
+              if (c.id !== commentId) return c;
+              const comment = postState.comments.find(com => com.id === commentId);
+              return {
+                ...c,
+                like_count: comment?.like_count || 0,
+              };
+            }),
+          };
+        })
+      );
+      
+      // Rollback liked comments state
+      setLikedComments((prev) => {
+        const isLiked = prev.includes(commentId);
+        return isLiked ? prev : prev.filter(id => id !== commentId);
+      });
+      
       toast({
         title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to like comment",
+        description: "Failed to like comment. Please try again.",
         variant: "destructive",
       });
     }
   };
 
-  // Handle post like
+  // Handle post like with enhanced social media logic
   const handleLike = async (postId: string, authorId: string) => {
     if (!user?.id) {
       toast({
@@ -557,22 +684,27 @@ export function Community() {
     }
 
     const alreadyLiked = likedPosts.includes(postId);
+    const post = forumPosts.find(p => p.id === postId);
 
-    // Optimistically update UI
+    // Optimistically update UI immediately
     setForumPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
+      prev.map((p) =>
+        p.id === postId
           ? {
-              ...post,
+              ...p,
               like_count: alreadyLiked
-                ? Math.max(0, post.like_count - 1)
-                : post.like_count + 1,
+                ? Math.max(0, p.like_count - 1)
+                : p.like_count + 1,
             }
-          : post
+          : p
       )
     );
+
+    // Update liked posts state
     setLikedPosts((prev) =>
-      alreadyLiked ? prev.filter((id) => id !== postId) : [...prev, postId]
+      alreadyLiked 
+        ? prev.filter((id) => id !== postId) 
+        : [...prev, postId]
     );
 
     try {
@@ -585,6 +717,13 @@ export function Community() {
           .eq("user_id", user.id);
 
         if (error) throw error;
+
+        // Update post like count in database
+        await supabase
+          .from("forum_posts")
+          .update({ like_count: Math.max(0, (post?.like_count || 1) - 1) })
+          .eq("id", postId);
+
       } else {
         // Like the post
         const { error } = await supabase.from("forum_likes").insert({
@@ -594,41 +733,54 @@ export function Community() {
 
         if (error) throw error;
 
+        // Update post like count in database
+        await supabase
+          .from("forum_posts")
+          .update({ like_count: (post?.like_count || 0) + 1 })
+          .eq("id", postId);
+
+        // Send notification to post author (if not the same user)
         if (authorId !== user.id) {
           await supabase.from("notifications").insert({
             user_id: authorId,
             title: "New Like on Your Post",
-            message: `${user.user_metadata?.name || "A user"} liked your post`,
+            message: `${user.user_metadata?.name || "A user"} liked your post "${post?.title || 'your post'}"`,
             type: "badge",
             is_read: false,
             data: {
               post_id: postId,
               action: "like",
+              liker_name: user.user_metadata?.name || "A user"
             },
           });
         }
       }
     } catch (error) {
       console.error("Error handling like:", error);
-      // Rollback optimistic update
+      
+      // Rollback optimistic updates on error
       setForumPosts((prev) =>
-        prev.map((post) =>
-          post.id === postId
+        prev.map((p) =>
+          p.id === postId
             ? {
-                ...post,
+                ...p,
                 like_count: alreadyLiked
-                  ? post.like_count + 1
-                  : Math.max(0, post.like_count - 1),
+                  ? p.like_count + 1
+                  : Math.max(0, p.like_count - 1),
               }
-            : post
+            : p
         )
       );
+      
       setLikedPosts((prev) =>
-        alreadyLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+        alreadyLiked 
+          ? [...prev, postId] 
+          : prev.filter((id) => id !== postId)
       );
+      
       toast({
         title: "Error",
-        description: "Failed to process like",
+        description: "Failed to process like. Please try again.",
         variant: "destructive",
       });
     }
@@ -716,7 +868,7 @@ export function Community() {
   useEffect(() => {
     const loadData = async () => {
       await fetchPostsWithCategoryFilter(activeCategory);
-      await fetchLikedPosts();
+      await fetchLikedContent();
     };
     loadData();
 
@@ -737,7 +889,7 @@ export function Community() {
         { event: "*", schema: "public", table: "forum_likes" },
         () => {
           fetchPostsWithCategoryFilter(activeCategory);
-          fetchLikedPosts();
+          fetchLikedContent();
         }
       )
       .subscribe();
@@ -756,10 +908,34 @@ export function Community() {
       )
       .subscribe();
 
+    const notificationsSubscription = supabase
+      .channel("notifications_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user?.id}`,
+        },
+        (payload: { new: any }) => {
+          // Show toast notification for new notifications
+          if (payload.new) {
+            toast({
+              title: payload.new.title,
+              description: payload.new.message,
+              duration: 5000,
+            });
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(postsSubscription);
       supabase.removeChannel(likesSubscription);
       supabase.removeChannel(commentsSubscription);
+      supabase.removeChannel(notificationsSubscription);
     };
   }, [user, activeCategory]);
 
@@ -1061,7 +1237,10 @@ export function Community() {
                                     }
                                     disabled={comment.id.startsWith("temp-")}
                                   >
-                                    <Heart className="h-3 w-3" />
+                                    <Heart 
+                                      className="h-3 w-3" 
+                                      fill={likedComments.includes(comment.id) ? "currentColor" : "none"}
+                                    />
                                     <span>{comment.like_count}</span>
                                   </button>
                                   {comment.author_id === user?.id && (

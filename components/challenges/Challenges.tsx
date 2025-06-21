@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence, Variants } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -35,98 +35,68 @@ export function Challenges() {
   const [showVerification, setShowVerification] = useState(false)
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
   const [joiningChallenge, setJoiningChallenge] = useState(false)
+  const [challenges, setChallenges] = useState<any[]>([])
+  const [joinedChallengeIds, setJoinedChallengeIds] = useState<string[]>([])
+  const [participantsMap, setParticipantsMap] = useState<{ [challengeId: string]: number }>({})
 
-  const [challenges, setChallenges] = useState([
-    {
-      id: 1,
-      title: "Plastic-Free Week Challenge",
-      description: "Avoid single-use plastics for 7 consecutive days",
-      category: "Waste Reduction",
-      points: 150,
-      participants: 1247,
-      timeLeft: "3 days",
-      difficulty: "Medium",
-      impact: "5kg plastic saved",
-      status: "active",
-      type: "plastic-free",
-      joined: false,
-    },
-    {
-      id: 2,
-      title: "Bike to Work/School",
-      description: "Use bicycle for daily commute for 5 days",
-      category: "Transportation",
-      points: 200,
-      participants: 892,
-      timeLeft: "1 week",
-      difficulty: "Easy",
-      impact: "12kg CO₂ reduced",
-      status: "active",
-      type: "bike-commute",
-      joined: false,
-    },
-    {
-      id: 3,
-      title: "Energy Saver Challenge",
-      description: "Reduce electricity consumption by 20%",
-      category: "Energy",
-      points: 300,
-      participants: 634,
-      timeLeft: "2 weeks",
-      difficulty: "Hard",
-      impact: "25kWh saved",
-      status: "active",
-      type: "energy-bill",
-      joined: false,
-    },
-    {
-      id: 4,
-      title: "Home Composting",
-      description: "Start composting kitchen waste",
-      category: "Waste Reduction",
-      points: 180,
-      participants: 445,
-      timeLeft: "5 days",
-      difficulty: "Medium",
-      impact: "3kg waste diverted",
-      status: "completed",
-      type: "composting",
-      joined: false,
-    },
-    {
-      id: 5,
-      title: "Grow Your Own Herbs",
-      description: "Plant and maintain a small herb garden",
-      category: "Food",
-      points: 120,
-      participants: 328,
-      timeLeft: "10 days",
-      difficulty: "Easy",
-      impact: "Local food production",
-      status: "active",
-      type: "plant-growing",
-      joined: false,
-    },
-    {
-      id: 6,
-      title: "Water Conservation",
-      description: "Reduce water usage by 15%",
-      category: "Water",
-      points: 250,
-      participants: 512,
-      timeLeft: "2 weeks",
-      difficulty: "Medium",
-      impact: "500L water saved",
-      status: "active",
-      type: "water-bill",
-      joined: false,
-    },
-  ])
+  // Fetch challenges from Supabase on mount
+  useEffect(() => {
+    const fetchChallenges = async () => {
+      const { data, error } = await supabase
+        .from("challenges")
+        .select("*, challenge_categories(name)");
+      if (!error && Array.isArray(data)) {
+        setChallenges(data);
+      }
+    };
+    fetchChallenges();
+  }, [supabase]);
+
+  // Fetch joined challenges for the user
+  useEffect(() => {
+    const fetchJoined = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("user_challenges")
+        .select("challenge_id")
+        .eq("user_id", user.id)
+        .in("status", ["active", "in_progress", "pending_verification", "completed"]);
+      if (!error && Array.isArray(data)) {
+        setJoinedChallengeIds(data.map((row) => row.challenge_id));
+      }
+    };
+    fetchJoined();
+  }, [user?.id, supabase]);
+
+  // Fetch participants count for each challenge
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      if (!challenges.length) return;
+      const challengeIds = challenges.map((c) => c.id)
+      const { data, error } = await supabase
+        .from("user_challenges")
+        .select("challenge_id")
+        .in("challenge_id", challengeIds)
+      if (!error && Array.isArray(data)) {
+        const countMap: { [challengeId: string]: number } = {}
+        data.forEach((row) => {
+          countMap[row.challenge_id] = (countMap[row.challenge_id] || 0) + 1
+        })
+        setParticipantsMap(countMap)
+      }
+    }
+    fetchParticipants()
+  }, [challenges, supabase])
 
   const filteredChallenges = challenges.filter((challenge) => {
-    if (selectedCategory !== "all" && challenge.category.toLowerCase() !== selectedCategory) return false
-    if (selectedStatus !== "all" && challenge.status !== selectedStatus) return false
-    return true
+    // Use category name from joined challenge_categories
+    const categoryName = challenge.challenge_categories?.name?.toLowerCase() || "";
+    if (selectedCategory !== "all" && categoryName !== selectedCategory) return false;
+    // For status, you may want to check user_challenges for joined/completed status
+    // For now, filter by is_active and end_date
+    if (selectedStatus === "active" && (!challenge.is_active || (challenge.end_date && new Date(challenge.end_date) < new Date()))) return false;
+    if (selectedStatus === "completed") return false; // You can implement completed logic if you track it
+    return true;
   })
 
   const handleVerificationComplete = (result: any) => {
@@ -143,27 +113,55 @@ export function Challenges() {
   }
 
   const handleJoinChallenge = async () => {
-    if (!selectedChallenge) return
+    if (!selectedChallenge || !user?.id) return
 
     setJoiningChallenge(true)
 
     try {
-      const updatedChallenges = challenges.map((challenge) =>
-        challenge.id === selectedChallenge.id
-          ? { ...challenge, joined: true, participants: challenge.participants + 1 }
-          : challenge,
-      )
+      // Debug: log IDs before upsert
+      console.log('user.id:', user.id, 'selectedChallenge.id:', selectedChallenge.id);
+      // Insert or upsert into user_challenges
+      const { data, error } = await supabase
+        .from("user_challenges")
+        .upsert([
+          {
+            user_id: user.id,
+            challenge_id: selectedChallenge.id,
+            status: "active",
+            progress: 0,
+          }
+        ], { onConflict: ['user_id', 'challenge_id'] });
+      // Debug: log full response
+      console.log('Upsert response:', { data, error });
 
-      setChallenges(updatedChallenges)
+      if (error) throw error;
+
+      // Insert activity into user_activity
+      await supabase.from("user_activity").insert([
+        {
+          user_id: user.id,
+          activity_type: "challenge",
+          description: `Joined the challenge: ${selectedChallenge.title}`,
+          points_earned: 0,
+          related_id: selectedChallenge.id,
+          related_type: "challenge"
+        }
+      ]);
 
       setJoinDialogOpen(false)
+
+      // Add to joinedChallengeIds immediately
+      setJoinedChallengeIds((prev) => [...prev, selectedChallenge.id])
 
       toast({
         title: "Thank you for joining!",
         description: `You've successfully joined the ${selectedChallenge.title}`,
         variant: "success",
       })
-    } catch (error: any) {
+
+      // Optionally: trigger a refresh of active challenges if you have a global fetchActiveChallenges
+      // If not, the Dashboard will pick it up on next mount
+    } catch (error) {
       console.error("Error joining challenge:", error)
       toast({
         title: "Error",
@@ -358,18 +356,18 @@ export function Challenges() {
                     <Badge
                       variant="secondary"
                       className={`${
-                        challenge.category === "Energy"
+                        challenge.challenge_categories?.name === "Energy"
                           ? "bg-yellow-100 text-yellow-800"
-                          : challenge.category === "Transportation"
+                          : challenge.challenge_categories?.name === "Transportation"
                             ? "bg-blue-100 text-blue-800"
-                            : challenge.category === "Water"
+                            : challenge.challenge_categories?.name === "Water"
                               ? "bg-cyan-100 text-cyan-800"
-                              : challenge.category === "Food"
+                              : challenge.challenge_categories?.name === "Food"
                                 ? "bg-orange-100 text-orange-800"
                                 : "bg-green-100 text-green-800"
                       }`}
                     >
-                      {challenge.category}
+                      {challenge.challenge_categories?.name}
                     </Badge>
                   </motion.div>
                   <motion.div variants={badgeVariants}>
@@ -422,7 +420,7 @@ export function Challenges() {
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.5, type: "spring" }}
                     >
-                      {challenge.impact}
+                      {challenge.impact || '-'}
                     </motion.span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -433,7 +431,7 @@ export function Challenges() {
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.6, type: "spring" }}
                     >
-                      {challenge.participants}
+                      {participantsMap[challenge.id] || 0}
                     </motion.span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -444,13 +442,13 @@ export function Challenges() {
                       animate={{ scale: 1 }}
                       transition={{ delay: 0.7, type: "spring" }}
                     >
-                      {challenge.timeLeft}
+                      {challenge.end_date ? `${Math.max(0, Math.ceil((new Date(challenge.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days` : '-'}
                     </motion.span>
                   </div>
 
                   <MotionButton
                     className="w-full mt-4 bg-green-600 hover:bg-green-700"
-                    disabled={challenge.status === "completed" || challenge.joined}
+                    disabled={joinedChallengeIds.includes(challenge.id) || !challenge.is_active || (challenge.end_date && new Date(challenge.end_date) < new Date())}
                     onClick={() => openJoinDialog(challenge)}
                     variants={buttonVariants}
                     whileHover="hover"
@@ -459,11 +457,9 @@ export function Challenges() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8 }}
                   >
-                    {challenge.status === "completed"
-                      ? "Completed"
-                      : challenge.joined
-                        ? "Already Joined"
-                        : "Join Challenge"}
+                    {joinedChallengeIds.includes(challenge.id)
+                      ? "Already Joined"
+                      : (challenge.is_active ? "Join Challenge" : "Completed")}
                   </MotionButton>
                 </MotionDiv>
               </CardContent>
@@ -556,7 +552,7 @@ export function Challenges() {
               </SelectTrigger>
               <SelectContent>
                 {challenges
-                  .filter((c) => c.joined || c.status === "active")
+                  .filter((c) => c.is_active)
                   .map((challenge) => (
                     <SelectItem key={challenge.id} value={challenge.id.toString()}>
                       {challenge.title}

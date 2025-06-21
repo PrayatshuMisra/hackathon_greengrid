@@ -55,28 +55,11 @@ export function Dashboard() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [activeChallenges, setActiveChallenges] = useState([
-    {
-      id: 1,
-      title: "Plastic-Free Week Challenge",
-      description: "Avoid single-use plastics for 7 consecutive days",
-      progress: 60,
-      daysLeft: 3,
-      points: 150,
-      participants: 1247,
-      type: "plastic-free",
-    },
-    {
-      id: 2,
-      title: "Bike to Work/School",
-      description: "Use bicycle for daily commute for 5 days",
-      progress: 80,
-      daysLeft: 1,
-      points: 200,
-      participants: 892,
-      type: "bike-commute",
-    },
-  ]);
+  const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
+  const [badges, setBadges] = useState<any[]>([]);
+  const [teamInfo, setTeamInfo] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [joinedChallengeIds, setJoinedChallengeIds] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchUserStats = async () => {
@@ -130,8 +113,100 @@ export function Dashboard() {
       }
     };
 
+    const fetchActiveChallenges = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("user_challenges")
+        .select("*, challenges(id, title, description, category_id, points, difficulty, challenge_type, duration_days, max_participants, verification_required, auto_verify, start_date, end_date, is_active, created_by, created_at, updated_at)")
+        .eq("user_id", user.id)
+        .in("status", ["active", "in_progress"])
+        .order("started_at", { ascending: false });
+      console.log('Fetched active challenges:', data, error);
+      if (!error && Array.isArray(data)) {
+        setActiveChallenges(data);
+      }
+    };
+
+    const fetchBadges = async () => {
+      if (!user?.id) return;
+      // Fetch badges earned by the user
+      const { data, error } = await supabase
+        .from("user_badges")
+        .select("*, badges(name, icon, rarity)")
+        .eq("user_id", user.id);
+      if (!error && Array.isArray(data)) {
+        setBadges(data);
+      }
+    };
+
+    const fetchTeamInfo = async () => {
+      if (!user?.team_id) return;
+      const { data, error } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("id", user.team_id)
+        .single();
+      if (!error && data) {
+        setTeamInfo(data);
+      }
+    };
+
+    const fetchRecentActivity = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("user_activity")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      if (!error && Array.isArray(data)) {
+        setRecentActivity(data);
+      }
+    };
+
+    const fetchJoined = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("user_challenges")
+        .select("challenge_id")
+        .eq("user_id", user.id)
+        .in("status", ["active", "in_progress", "pending_verification", "completed"]);
+      if (!error && Array.isArray(data)) {
+        setJoinedChallengeIds(data.map((row) => row.challenge_id));
+      }
+    };
+
     fetchUserStats();
-  }, [user?.id, supabase]);
+    fetchActiveChallenges();
+    fetchBadges();
+    fetchTeamInfo();
+    fetchRecentActivity();
+    fetchJoined();
+
+    // Real-time subscription for user_challenges
+    const channel = supabase
+      .channel('user_challenges_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_challenges', filter: `user_id=eq.${user?.id}` },
+        () => fetchActiveChallenges()
+      )
+      .subscribe();
+
+    // Real-time subscription for user_activity
+    const activityChannel = supabase
+      .channel('user_activity_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_activity', filter: `user_id=eq.${user?.id}` },
+        () => fetchRecentActivity()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(activityChannel);
+    };
+  }, [user?.id, user?.team_id, supabase]);
 
   const getLevelTitle = (level: number) => {
     const titles = [
@@ -149,42 +224,6 @@ export function Dashboard() {
     return titles[Math.min(level - 1, titles.length - 1)];
   };
 
-  const badges = [
-    { name: "Plastic-Free Warrior", icon: "🛡️", earned: true, rarity: "Epic" },
-    { name: "Energy Saver", icon: "⚡", earned: true, rarity: "Rare" },
-    { name: "Water Guardian", icon: "💧", earned: false, rarity: "Legendary" },
-    { name: "Green Commuter", icon: "🚲", earned: true, rarity: "Common" },
-    { name: "Compost Champion", icon: "🌱", earned: false, rarity: "Rare" },
-    { name: "Tree Planter", icon: "🌳", earned: true, rarity: "Epic" },
-  ];
-
-  const recentActivity = [
-    {
-      action: "Completed Plastic-Free Day 4",
-      points: 25,
-      time: "2 hours ago",
-      type: "challenge",
-    },
-    {
-      action: "Joined Bike Commute Challenge",
-      points: 0,
-      time: "1 day ago",
-      type: "join",
-    },
-    {
-      action: "Earned Energy Saver Badge",
-      points: 100,
-      time: "3 days ago",
-      type: "badge",
-    },
-    {
-      action: "Planted tree in community drive",
-      points: 50,
-      time: "1 week ago",
-      type: "event",
-    },
-  ];
-
   const handleSubmitProof = (challenge: any) => {
     setSelectedChallenge(challenge);
     setSubmitProofOpen(true);
@@ -198,41 +237,58 @@ export function Dashboard() {
   };
 
   const handleVerificationComplete = async (result: any) => {
-    if (result.success) {
+    if (result.success && selectedChallenge) {
       try {
-        const updatedChallenges = activeChallenges.map((challenge) =>
-          challenge.id === selectedChallenge.id
-            ? { ...challenge, progress: Math.min(100, challenge.progress + 20) }
-            : challenge
-        );
+        // Update challenge progress in DB
+        const { data, error } = await supabase
+          .from("user_challenges")
+          .update({ progress: Math.min(100, (selectedChallenge.progress || 0) + 20) })
+          .eq("id", selectedChallenge.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
 
-        setActiveChallenges(updatedChallenges);
-
-        if (
-          updatedChallenges.find((c) => c.id === selectedChallenge.id)
-            ?.progress === 100
-        ) {
-          toast({
-            title: "Challenge Completed!",
-            description: `You've earned ${selectedChallenge.points} EcoPoints! 🎉`,
-            variant: "success",
-          });
-
-          // Redirect to certificate page
-          router.push(
-            `/certificate?challenge=${encodeURIComponent(
-              selectedChallenge.title
-            )}&points=${selectedChallenge.points}`
+        if (data) {
+          setActiveChallenges((prev) =>
+            prev.map((challenge) =>
+              challenge.id === selectedChallenge.id
+                ? { ...challenge, progress: data.progress }
+                : challenge
+            )
           );
-        } else {
-          toast({
-            title: "Verification Successful!",
-            description:
-              "Your challenge proof has been verified and your progress has been updated.",
-            variant: "success",
-          });
-        }
 
+          // Add to recent activity on successful verification
+          if (user?.id) {
+            await supabase.from("user_activity").insert({
+              user_id: user.id,
+              activity_type: "challenge",
+              description: `Proof verified for challenge: "${selectedChallenge.challenges?.title}"`,
+              related_id: selectedChallenge.challenges?.id,
+              related_type: "challenge",
+            });
+          }
+
+          if (data.progress === 100) {
+            toast({
+              title: "Challenge Completed!",
+              description: `You've earned ${selectedChallenge.challenges?.points || 0} EcoPoints! 🎉`,
+              variant: "success",
+            });
+            router.push(
+              `/certificate?challenge=${encodeURIComponent(
+                selectedChallenge.challenges?.title || ""
+              )}&points=${selectedChallenge.challenges?.points || 0}`
+            );
+          } else {
+            toast({
+              title: "Verification Successful!",
+              description:
+                "Your challenge proof has been verified and your progress has been updated.",
+              variant: "success",
+            });
+          }
+        }
         setSubmitProofOpen(false);
       } catch (error: any) {
         toast({
@@ -405,20 +461,20 @@ export function Dashboard() {
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
                           <h4 className="font-semibold text-green-800 mb-1">
-                            {challenge.title}
+                            {challenge.challenges?.title}
                           </h4>
                           <p className="text-sm text-green-600 mb-2">
-                            {challenge.description}
+                            {challenge.challenges?.description}
                           </p>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-green-700">Progress</span>
                               <span className="font-medium text-green-800">
-                                {challenge.progress}%
+                                {challenge.progress || 0}%
                               </span>
                             </div>
                             <Progress
-                              value={challenge.progress}
+                              value={challenge.progress || 0}
                               className="h-2"
                             />
                           </div>
@@ -427,18 +483,14 @@ export function Dashboard() {
                           variant="secondary"
                           className="bg-green-200 text-green-800 ml-4"
                         >
-                          {challenge.points} pts
+                          {challenge.challenges?.points} pts
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4 text-sm text-green-600">
                           <div className="flex items-center space-x-1">
                             <Clock className="h-4 w-4" />
-                            <span>{challenge.daysLeft} days left</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Users className="h-4 w-4" />
-                            <span>{challenge.participants} joined</span>
+                            <span>{challenge.challenges?.end_date ? `${Math.ceil((new Date(challenge.challenges.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days left` : "-"}</span>
                           </div>
                         </div>
                         <Button
@@ -486,38 +538,37 @@ export function Dashboard() {
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        activity.type === "challenge"
+                        activity.activity_type === "challenge"
                           ? "bg-green-100"
-                          : activity.type === "badge"
+                          : activity.activity_type === "badge"
                           ? "bg-yellow-100"
-                          : activity.type === "event"
+                          : activity.activity_type === "event"
                           ? "bg-blue-100"
                           : "bg-gray-100"
                       }`}
                     >
-                      {activity.type === "challenge" && (
+                      {activity.activity_type === "challenge" && (
                         <Target className="h-4 w-4 text-green-600" />
                       )}
-                      {activity.type === "badge" && (
+                      {activity.activity_type === "badge" && (
                         <Award className="h-4 w-4 text-yellow-600" />
                       )}
-                      {activity.type === "event" && (
+                      {activity.activity_type === "event" && (
                         <TreePine className="h-4 w-4 text-blue-600" />
-                      )}
-                      {activity.type === "join" && (
-                        <Users className="h-4 w-4 text-gray-600" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
+                      <p className="text-sm font-medium">{activity.description}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(activity.created_at).toLocaleString()}
+                      </p>
                     </div>
-                    {activity.points > 0 && (
+                    {activity.points_earned > 0 && (
                       <Badge
                         variant="outline"
                         className="text-green-600 border-green-300"
                       >
-                        +{activity.points} pts
+                        +{activity.points_earned} pts
                       </Badge>
                     )}
                   </div>
@@ -542,7 +593,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">
-                {badges.map((badge, index) => (
+                {badges.length > 0 ? badges.map((badge, index) => (
                   <div
                     key={index}
                     className={`relative text-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
@@ -551,29 +602,29 @@ export function Dashboard() {
                         : "border-gray-200 bg-gray-50 opacity-50 hover:opacity-75"
                     }`}
                   >
-                    <div className="text-2xl mb-1">{badge.icon}</div>
+                    <div className="text-2xl mb-1">{badge.badges?.icon}</div>
                     <div className="text-xs font-medium text-gray-700 mb-1">
-                      {badge.name}
+                      {badge.badges?.name}
                     </div>
                     <Badge
                       variant="outline"
                       className={`text-xs ${
-                        badge.rarity === "Legendary"
+                        badge.badges?.rarity === "Legendary"
                           ? "border-purple-300 text-purple-600"
-                          : badge.rarity === "Epic"
+                          : badge.badges?.rarity === "Epic"
                           ? "border-orange-300 text-orange-600"
-                          : badge.rarity === "Rare"
+                          : badge.badges?.rarity === "Rare"
                           ? "border-blue-300 text-blue-600"
                           : "border-gray-300 text-gray-600"
                       }`}
                     >
-                      {badge.rarity}
+                      {badge.badges?.rarity}
                     </Badge>
                     {badge.earned && (
                       <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-green-600 bg-white rounded-full" />
                     )}
                   </div>
-                ))}
+                )) : <div className="col-span-3 text-center text-gray-400">No badges earned yet</div>}
               </div>
             </CardContent>
           </Card>
@@ -585,29 +636,33 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Team Name</span>
-                  <span className="font-medium">EcoWarriors Delhi</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Rank</span>
-                  <Badge className="bg-yellow-100 text-yellow-800">#1</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Members</span>
-                  <span className="font-medium">24</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Points</span>
-                  <span className="font-bold text-green-600">4,580</span>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full mt-3"
-                  onClick={() => router.push("/teams")}
-                >
-                  View Team Details
-                </Button>
+                {teamInfo ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Team Name</span>
+                      <span className="font-medium">{teamInfo.name}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Rank</span>
+                      <Badge className="bg-yellow-100 text-yellow-800">#{teamInfo.rank}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Members</span>
+                      <span className="font-medium">{teamInfo.member_count}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Total Points</span>
+                      <span className="font-bold text-green-600">{teamInfo.total_points}</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full mt-3"
+                      onClick={() => router.push("/teams")}
+                    >
+                      View Team Details
+                    </Button>
+                  </>
+                ) : <div className="text-center text-gray-400">No team joined yet</div>}
               </div>
             </CardContent>
           </Card>
@@ -636,7 +691,7 @@ export function Dashboard() {
           <div className="space-y-4 py-4">
             {selectedChallenge && (
               <AIVerification
-                challengeType={selectedChallenge.type}
+                challengeType={selectedChallenge.challenges?.challenge_type || ""}
                 onVerificationComplete={handleVerificationComplete}
               />
             )}

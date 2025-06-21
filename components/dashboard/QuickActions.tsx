@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,25 +30,48 @@ export function QuickActions() {
   const { toast } = useToast()
   const router = useRouter()
 
-  const activeChallenges = [
-    { id: "1", title: "Plastic-Free Week Challenge", type: "plastic-free" },
-    { id: "2", title: "Bike to Work/School", type: "bike-commute" },
-    { id: "3", title: "Energy Saver Challenge", type: "energy-bill" },
-    { id: "4", title: "Home Composting", type: "composting" },
-    { id: "5", title: "Grow Your Own Herbs", type: "plant-growing" },
-  ]
+  // New: State for all challenges and user challenges
+  const [allChallenges, setAllChallenges] = useState<any[]>([])
+  const [userChallenges, setUserChallenges] = useState<any[]>([])
+  const [availableChallenges, setAvailableChallenges] = useState<any[]>([])
+  const [inProgressChallenges, setInProgressChallenges] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchUserChallenges = async () => {
+      if (!user?.id) return;
+      // Fetch all challenges
+      const { data: allChals } = await supabase.from("challenges").select("*");
+      setAllChallenges(allChals || []);
+      // Fetch user_challenges
+      const { data: userChals } = await supabase
+        .from("user_challenges")
+        .select("challenge_id, status, challenges(*)")
+        .eq("user_id", user.id);
+      setUserChallenges(userChals || []);
+      // Challenges not yet joined
+      const joinedIds = (userChals || []).map((uc: any) => uc.challenge_id);
+      setAvailableChallenges((allChals || []).filter((c: any) => !joinedIds.includes(c.id)));
+      // Challenges in progress
+      setInProgressChallenges((userChals || []).filter((uc: any) => uc.status === "active" || uc.status === "in_progress"));
+    };
+    fetchUserChallenges();
+  }, [user?.id, supabase]);
 
   const handleJoinChallenge = async () => {
-    if (!selectedChallenge) return
-
+    if (!selectedChallenge || !user?.id) return;
     try {
-
+      // Insert into user_challenges
+      await supabase.from("user_challenges").upsert({
+        user_id: user.id,
+        challenge_id: selectedChallenge,
+        status: "active",
+        progress: 0,
+      }, { onConflict: ["user_id", "challenge_id"] });
       toast({
         title: "Thank you for joining!",
-        description: `You've successfully joined the ${activeChallenges.find((c) => c.id === selectedChallenge)?.title}`,
+        description: `You've successfully joined the ${allChallenges.find((c: any) => c.id === selectedChallenge)?.title}`,
         variant: "success",
       })
-
       setJoinChallengeOpen(false)
       router.push("/challenges")
     } catch (error: any) {
@@ -124,7 +147,7 @@ export function QuickActions() {
                 <SelectValue placeholder="Select a challenge" />
               </SelectTrigger>
               <SelectContent>
-                {activeChallenges.map((challenge) => (
+                {availableChallenges.map((challenge) => (
                   <SelectItem key={challenge.id} value={challenge.id}>
                     {challenge.title}
                   </SelectItem>
@@ -164,9 +187,9 @@ export function QuickActions() {
             <Select
               onValueChange={(value) => {
                 setSelectedChallenge(value)
-                const challenge = activeChallenges.find((c) => c.id === value)
+                const challenge = inProgressChallenges.find((c) => c.challenge_id === value)
                 if (challenge) {
-                  setSelectedChallengeType(challenge.type)
+                  setSelectedChallengeType(challenge.challenges.type)
                 }
               }}
             >
@@ -174,9 +197,9 @@ export function QuickActions() {
                 <SelectValue placeholder="Select a challenge" />
               </SelectTrigger>
               <SelectContent>
-                {activeChallenges.map((challenge) => (
-                  <SelectItem key={challenge.id} value={challenge.id}>
-                    {challenge.title}
+                {inProgressChallenges.map((uc) => (
+                  <SelectItem key={uc.challenge_id} value={uc.challenge_id}>
+                    {uc.challenges.title}
                   </SelectItem>
                 ))}
               </SelectContent>

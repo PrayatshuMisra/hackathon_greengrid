@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import Papa from "papaparse";
 import { FaLinkedin, FaWhatsapp, FaXTwitter } from "react-icons/fa6";
+import { useApp } from "@/app/providers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import {
   Card,
@@ -27,35 +29,56 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useRealtime } from "@/lib/realtime";
 
 export function Leaderboard() {
+  const { supabase, user } = useApp();
   const [leaderboardType, setLeaderboardType] = useState("teams");
   const [leaderboardScope, setLeaderboardScope] = useState("global");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const { teams } = useRealtime();
+  const [teamsData, setTeamsData] = useState<any[]>([]);
+  const [individualsData, setIndividualsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const teamsData = [
-    { id: 1, name: "EcoWarriors Delhi", members: 24, points: 4580, rank: 1, city: "Delhi" },
-    { id: 2, name: "Green Guardians Mumbai", members: 31, points: 4320, rank: 2, city: "Mumbai" },
-    { id: 3, name: "Bangalore Bikers", members: 18, points: 3890, rank: 3, city: "Bangalore" },
-    { id: 4, name: "Chennai Champions", members: 22, points: 3650, rank: 4, city: "Chennai" },
-    { id: 5, name: "Pune Planet Savers", members: 27, points: 3420, rank: 5, city: "Pune" },
-    { id: 6, name: "Hyderabad Eco Heroes", members: 19, points: 3210, rank: 6, city: "Hyderabad" },
-    { id: 7, name: "Kolkata Green Team", members: 21, points: 3050, rank: 7, city: "Kolkata" },
-    { id: 8, name: "Jaipur Sustainability Squad", members: 16, points: 2890, rank: 8, city: "Jaipur" },
-  ];
+  const [userRankInfo, setUserRankInfo] = useState<any>(null);
+  const [teamRankInfo, setTeamRankInfo] = useState<any>(null);
 
-  const individualsData = [
-    { id: 1, name: "Rahul Sharma", points: 1250, rank: 1, city: "Delhi", team: "EcoWarriors Delhi" },
-    { id: 2, name: "Priya Patel", points: 1180, rank: 2, city: "Mumbai", team: "Green Guardians Mumbai" },
-    { id: 3, name: "Amit Kumar", points: 1090, rank: 3, city: "Bangalore", team: "Bangalore Bikers" },
-    { id: 4, name: "Deepa Nair", points: 980, rank: 4, city: "Chennai", team: "Chennai Champions" },
-    { id: 5, name: "Vikram Singh", points: 920, rank: 5, city: "Delhi", team: "EcoWarriors Delhi" },
-    { id: 6, name: "Ananya Reddy", points: 870, rank: 6, city: "Hyderabad", team: "Hyderabad Eco Heroes" },
-    { id: 7, name: "Rajesh Gupta", points: 830, rank: 7, city: "Pune", team: "Pune Planet Savers" },
-    { id: 8, name: "Meera Joshi", points: 790, rank: 8, city: "Mumbai", team: "Green Guardians Mumbai" },
-  ];
+  useEffect(() => {
+    const fetchLeaderboards = async () => {
+      setLoading(true);
+      try {
+        const { data: teams, error: teamsError } = await supabase
+          .from("team_leaderboard")
+          .select("*")
+          .order("rank", { ascending: true, nullsFirst: false });
+        if (teamsError) throw teamsError;
+        setTeamsData(teams || []);
+
+        const { data: individuals, error: individualsError } = await supabase
+          .from("user_leaderboard")
+          .select("*")
+          .order("rank", { ascending: true, nullsFirst: false });
+        if (individualsError) throw individualsError;
+        setIndividualsData(individuals || []);
+
+      } catch (error) {
+        console.error("Error fetching leaderboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLeaderboards();
+  }, [supabase]);
+
+  useEffect(() => {
+    if (user && individualsData.length > 0) {
+      const currentUserData = individualsData.find(p => p.id === user.id);
+      setUserRankInfo(currentUserData);
+    }
+    if (user?.team_id && teamsData.length > 0) {
+      const currentTeamData = teamsData.find(t => t.id === user.team_id);
+      setTeamRankInfo(currentTeamData);
+    }
+  }, [user, individualsData, teamsData]);
 
   const leaderboardData = leaderboardType === "teams" ? teamsData : individualsData;
 
@@ -90,10 +113,10 @@ export function Leaderboard() {
     const csvData = leaderboardData.map((item) => ({
       Rank: item.rank,
       Name: item.name,
-      Points: item.points,
+      Points: item.total_points,
       ...(leaderboardType === "teams"
-        ? { Members: item.members }
-        : { Team: item.team }),
+        ? { Members: item.member_count }
+        : { Team: item.team_name }),
       City: item.city,
     }));
     const csv = Papa.unparse(csvData);
@@ -170,6 +193,19 @@ export function Leaderboard() {
       <motion.div id="leaderboard-section" initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.1 } } }} className="space-y-6">
         {/* Top 3 Cards */}
         <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={index}>
+                  <CardContent className="pt-6">
+                    <Skeleton className="h-16 w-16 rounded-full mx-auto mb-4" />
+                    <Skeleton className="h-6 w-3/4 mx-auto mb-2" />
+                    <Skeleton className="h-4 w-1/2 mx-auto mb-2" />
+                    <Skeleton className="h-8 w-1/3 mx-auto mb-1" />
+                    <Skeleton className="h-4 w-1/4 mx-auto" />
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
           <AnimatePresence mode="wait">
             {leaderboardData.slice(0, 3).map((item, index) => (
               <motion.div
@@ -201,16 +237,17 @@ export function Leaderboard() {
                     <h3 className="font-bold text-lg">{item.name}</h3>
                     <p className="text-sm text-gray-600 mb-2">{item.city}</p>
                     <div className="space-y-1">
-                      <div className="text-2xl font-bold text-green-600">{item.points.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-green-600">{item.total_points.toLocaleString()}</div>
                       <div className="text-sm text-gray-500">EcoPoints</div>
-                      {leaderboardType === "teams" && <div className="text-sm text-gray-500">{item.members} members</div>}
-                      {leaderboardType === "individuals" && <div className="text-sm text-gray-500">Team: {item.team}</div>}
+                      {leaderboardType === "teams" && <div className="text-sm text-gray-500">{item.member_count} members</div>}
+                      {leaderboardType === "individuals" && <div className="text-sm text-gray-500">Team: {item.team_name}</div>}
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
             ))}
           </AnimatePresence>
+          )}
       </motion.div>
       </motion.div>
 
@@ -221,6 +258,25 @@ export function Leaderboard() {
               <CardTitle>{leaderboardType === "teams" ? "Team Rankings" : "Individual Rankings"}</CardTitle>
             </CardHeader>
             <CardContent>
+              {loading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="w-8 h-8 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                      </div>
+                      <div className="text-right space-y-2">
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <motion.div className="space-y-3" variants={{ show: { transition: { staggerChildren: 0.05 } } }}>
                 {leaderboardData.map((item) => (
                   <motion.div
@@ -234,22 +290,23 @@ export function Leaderboard() {
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                         item.rank <= 3 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-600"
                       }`}>
-                        {item.rank}
+                        {item.rank || '-'}
                       </div>
                       <div>
                         <h4 className="font-semibold">{item.name}</h4>
                         <p className="text-sm text-gray-500">
-                          {item.city} • {leaderboardType === "teams" ? `${item.members} members` : item.team}
+                          {item.city} • {leaderboardType === "teams" ? `${item.member_count} members` : item.team_name}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-green-600">{item.points.toLocaleString()}</div>
+                      <div className="font-bold text-green-600">{item.total_points.toLocaleString()}</div>
                       <div className="text-sm text-gray-500">EcoPoints</div>
                     </div>
                   </motion.div>
                 ))}
               </motion.div>
+              )}
             </CardContent>
           </Card>
       </motion.div>
@@ -258,32 +315,68 @@ export function Leaderboard() {
         <Card className="border-green-200 bg-green-50">
           <CardHeader>
             <CardTitle className="text-green-800">
-              {leaderboardType === "teams" ? "Your Team: EcoWarriors Delhi" : "Your Ranking"}
+              {leaderboardType === "teams" 
+                ? `Your Team: ${teamRankInfo ? teamRankInfo.name : 'N/A'}`
+                : "Your Ranking"}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-700">{leaderboardType === "teams" ? "1st" : "156th"}</div>
-                <div className="text-sm text-green-600">Current Rank</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-700">{leaderboardType === "teams" ? "4,580" : "2,340"}</div>
-                <div className="text-sm text-green-600">Total Points</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-700">
-                  {leaderboardType === "teams" ? "24" : "EcoWarriors Delhi"}
+            { loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                 </div>
-                <div className="text-sm text-green-600">{leaderboardType === "teams" ? "Team Members" : "Team"}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-700">{leaderboardType === "teams" ? "18" : "12"}</div>
-                <div className="text-sm text-green-600">
-                  {leaderboardType === "teams" ? "Active Challenges" : "Challenges Completed"}
-                </div>
-              </div>
-            </div>
+            ) : (
+                leaderboardType === "teams" ? (
+                    teamRankInfo ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{teamRankInfo.rank || 'N/A'}</div>
+                            <div className="text-sm text-green-600">Current Rank</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{teamRankInfo.total_points?.toLocaleString() || 0}</div>
+                            <div className="text-sm text-green-600">Total Points</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{teamRankInfo.member_count || 0}</div>
+                            <div className="text-sm text-green-600">Team Members</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{teamRankInfo.total_challenges_completed || 0}</div>
+                            <div className="text-sm text-green-600">Challenges Done</div>
+                          </div>
+                        </div>
+                    ) : (
+                        <div className="text-center text-green-700">You are not part of a team yet.</div>
+                    )
+                ) : (
+                    userRankInfo ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{userRankInfo.rank || 'N/A'}</div>
+                            <div className="text-sm text-green-600">Current Rank</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{userRankInfo.total_points?.toLocaleString() || 0}</div>
+                            <div className="text-sm text-green-600">Total Points</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{userRankInfo.team_name || 'No Team'}</div>
+                            <div className="text-sm text-green-600">Team</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-700">{userRankInfo.completed_challenges || 0}</div>
+                            <div className="text-sm text-green-600">Challenges Completed</div>
+                          </div>
+                        </div>
+                    ) : (
+                        <div className="text-center text-green-700">Your rank will appear here once you earn points.</div>
+                    )
+                )
+            )}
           </CardContent>
         </Card>
       </motion.div>
