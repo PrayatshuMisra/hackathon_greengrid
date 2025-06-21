@@ -19,6 +19,8 @@ import { AIVerification } from "@/components/ai/AIVerification"
 import { Camera, Upload, Calendar, MapPin } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/app/providers"
+import { toast } from "react-hot-toast";
+
 
 const MotionCard = motion(Card)
 const MotionDiv = motion.div
@@ -644,105 +646,112 @@ export function Challenges() {
       </AnimatePresence>
 
       {/* Upcoming Eco Events */}
-      <MotionCard
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
+<MotionCard
+  initial={{ opacity: 0, y: 30 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, delay: 0.5 }}
+>
+  <CardHeader>
+    <CardTitle className="flex items-center space-x-2">
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.3, delay: 0.6, type: "spring" }}
       >
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.6, type: "spring" }}
-            >
-              <Calendar className="h-5 w-5 text-green-600" />
-            </motion.div>
-            <span>Upcoming Eco Events</span>
-          </CardTitle>
-          <CardDescription>Join local events to make a bigger impact together</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MotionDiv 
-            className="space-y-4"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+        <Calendar className="h-5 w-5 text-green-600" />
+      </motion.div>
+      <span>Upcoming Eco Events</span>
+    </CardTitle>
+    <CardDescription>Join local events to make a bigger impact together</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <MotionDiv
+      className="space-y-4"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {[
+        {
+          title: "Community Tree Plantation Drive",
+          date: "July 15, 2025",
+          location: "Central Park, Delhi",
+          organizer: "Green Delhi Initiative",
+          participants: 45,
+        },
+        {
+          title: "Plastic-Free Workshop",
+          date: "July 18, 2025",
+          location: "Online Event",
+          organizer: "Zero Waste India",
+          participants: 128,
+        },
+      ].map((event, index) => (
+        <motion.div
+          key={index}
+          className="border border-green-200 rounded-lg p-4 bg-green-50"
+          variants={eventVariants}
+          whileHover="hover"
+        >
+          <MotionDiv
+            className="flex justify-between items-start mb-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: index * 0.1 }}
           >
-            {[
-              {
-                title: "Community Tree Plantation Drive",
-                date: "Dec 15, 2024",
-                location: "Central Park, Delhi",
-                organizer: "Green Delhi Initiative",
-                participants: 45,
-              },
-              {
-                title: "Plastic-Free Workshop",
-                date: "Dec 18, 2024",
-                location: "Online Event",
-                organizer: "Zero Waste India",
-                participants: 128,
-              },
-            ].map((event, index) => (
-              <motion.div 
-                key={index} 
-                className="border border-green-200 rounded-lg p-4 bg-green-50"
-                variants={eventVariants}
-                whileHover="hover"
-              >
-                <MotionDiv 
-                  className="flex justify-between items-start mb-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <div>
-                    <h4 className="font-semibold text-green-800">{event.title}</h4>
-                    <p className="text-sm text-green-600">by {event.organizer}</p>
-                  </div>
-                  <motion.div
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
-                  >
-                    <Badge variant="outline" className="text-green-700 border-green-300">
-                      {event.participants} joined
-                    </Badge>
-                  </motion.div>
-                </MotionDiv>
-                <MotionDiv 
-                  className="flex items-center space-x-4 text-sm text-green-600 mb-3"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 + 0.1 }}
-                >
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{event.date}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>{event.location}</span>
-                  </div>
-                </MotionDiv>
-                <MotionButton 
-                  size="sm" 
-                  className="bg-green-600 hover:bg-green-700"
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 + 0.3 }}
-                >
-                  Join Event
-                </MotionButton>
-              </motion.div>
-            ))}
+            <div>
+              <h4 className="font-semibold text-green-800">{event.title}</h4>
+              <p className="text-sm text-green-600">by {event.organizer}</p>
+            </div>
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
+            >
+              <Badge variant="outline" className="text-green-700 border-green-300">
+                {event.participants} joined
+              </Badge>
+            </motion.div>
           </MotionDiv>
-        </CardContent>
-      </MotionCard>
+          <MotionDiv
+            className="flex items-center space-x-4 text-sm text-green-600 mb-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 + 0.1 }}
+          >
+            <div className="flex items-center space-x-1">
+              <Calendar className="h-4 w-4" />
+              <span>{event.date}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <MapPin className="h-4 w-4" />
+              <span>{event.location}</span>
+            </div>
+          </MotionDiv>
+          <MotionButton
+            size="sm"
+            className="bg-green-600 hover:bg-green-700"
+            variants={buttonVariants}
+            whileHover="hover"
+            whileTap="tap"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.1 + 0.3 }}
+            onClick={() =>
+            toast({
+            title: "Coming Soon!",
+            description: "Stay tuned for event participation.",
+            className: "bg-green-50 text-green-800 border border-green-200 shadow-md rounded-lg p-4",
+            })
+            }
+            >
+            Join Event
+          </MotionButton>
+        </motion.div>
+      ))}
+    </MotionDiv>
+  </CardContent>
+</MotionCard>
     </MotionDiv>
   )
 }

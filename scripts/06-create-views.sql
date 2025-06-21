@@ -118,6 +118,7 @@ SELECT
   fp.is_pinned,
   fp.created_at,
   fp.updated_at,
+  fp.category_id,
   p.name as author_name,
   p.avatar_url as author_avatar,
   fc.name as category_name,

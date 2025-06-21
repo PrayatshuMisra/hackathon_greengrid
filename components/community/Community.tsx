@@ -1,12 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { useEffect, useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { motion, AnimatePresence, Variants } from "framer-motion"
+import { useToast } from "@/hooks/use-toast"
+const MotionCard = motion(Card)
+const MotionDiv = motion.div
+const MotionButton = motion(Button)
 import {
   Dialog,
   DialogContent,
@@ -14,188 +19,753 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Plus, MessageSquare, Calendar, Share2, Heart, Send, MapPin } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+} from "@/components/ui/dialog";
+import {
+  Plus,
+  MessageSquare,
+  Calendar,
+  Share2,
+  Heart,
+  Send,
+  MapPin,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Copy,
+  Pin,
+} from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import { useApp } from "@/app/providers";
+
+type Comment = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  author_name: string;
+  avatar_url: string;
+  content: string;
+  like_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+type Post = {
+  category: string;
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  author_name: string;
+  avatar_url: string;
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+  category_color: string;
+  reply_count: number;
+  like_count: number;
+  is_pinned: boolean;
+  is_locked: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  post_count: number;
+  created_at: string;
+};
+
+type ExpandedPostState = {
+  postId: string;
+  comments: Comment[];
+  newComment: string;
+};
 
 export function Community() {
-  const [newPostOpen, setNewPostOpen] = useState(false)
-  const [postContent, setPostContent] = useState("")
-  const [activeCategory, setActiveCategory] = useState("all")
-  const [likedPosts, setLikedPosts] = useState<number[]>([])
-  const [comments, setComments] = useState<{ [key: number]: string[] }>({
-    1: [
-      "Composting indoors? Try bokashi composting - no smell!",
-      "I use a small bin with a tight lid and add lots of brown material like shredded paper",
-      "The key is balancing greens and browns - about 2:1 ratio works best for me"
-    ],
-    2: [
-      "Great job! How did you handle grocery shopping?",
-      "I switched to glass containers too - game changer!"
-    ],
-    3: [
-      "I use a smart plug with energy monitoring",
-      "Check out the Kill A Watt electricity usage monitor"
-    ],
-    4: [
-      "I'll be there with 3 friends!",
-      "What time does it start?",
-      "Do we need to bring anything?"
-    ]
-  })
-  const [commentText, setCommentText] = useState("")
-  const [postTitle, setPostTitle] = useState("")
-  const [postCategory, setPostCategory] = useState("tips")
-  const [expandedPosts, setExpandedPosts] = useState<number[]>([])
+  const { supabase, user } = useApp();
+  const [forumPosts, setForumPosts] = useState<Post[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [newPostOpen, setNewPostOpen] = useState(false);
+  const [postTitle, setPostTitle] = useState("");
+  const [postContent, setPostContent] = useState("");
+  const [postCategory, setPostCategory] = useState<string>("");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedPosts, setExpandedPosts] = useState<ExpandedPostState[]>([]);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [currentSharedPost, setCurrentSharedPost] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
-  const forumCategories = [
-    { id: "tips", name: "Tips & Tricks", icon: "💡", posts: 234 },
-    { id: "stories", name: "Success Stories", icon: "🎉", posts: 156 },
-    { id: "questions", name: "Q&A", icon: "❓", posts: 89 },
-    { id: "events", name: "Local Events", icon: "📅", posts: 67 },
-  ]
+  // Fetch forum categories
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("forum_categories")
+        .select("*")
+        .order("name", { ascending: true });
 
-  const [forumPosts, setForumPosts] = useState([
-    {
-      id: 1,
-      author: "EcoEnthusiast",
-      avatar: "/placeholder.svg",
-      title: "Best composting tips for beginners?",
-      content:
-        "Just started the home composting challenge. Any tips for getting started? I'm particularly concerned about odors in my apartment.",
-      category: "tips",
-      replies: 12,
-      likes: 24,
-      time: "2 hours ago",
-    },
-    {
-      id: 2,
-      author: "GreenGuru",
-      avatar: "/placeholder.svg",
-      title: "Amazing results from plastic-free week!",
-      content:
-        "Completed the plastic-free challenge and saved 8kg of plastic waste. Here's how I managed shopping, food storage, and daily routines without single-use plastics...",
-      category: "stories",
-      replies: 8,
-      likes: 45,
-      time: "5 hours ago",
-    },
-    {
-      id: 3,
-      author: "ClimateChampion",
-      avatar: "/placeholder.svg",
-      title: "How to measure electricity savings accurately?",
-      content:
-        "I'm participating in the Energy Saver Challenge but I'm not sure how to accurately measure my electricity consumption reduction. Any tools or methods you recommend?",
-      category: "questions",
-      replies: 15,
-      likes: 18,
-      time: "1 day ago",
-    },
-    {
-      id: 4,
-      author: "EcoOrganizer",
-      avatar: "/placeholder.svg",
-      title: "Join our weekend tree planting event!",
-      content:
-        "We're organizing a tree planting event this Saturday at Central Park. We aim to plant 100 native trees. Tools and saplings will be provided. Just bring your enthusiasm!",
-      category: "events",
-      replies: 32,
-      likes: 67,
-      time: "2 days ago",
-    },
-  ])
+      if (error) throw error;
 
-  const filteredPosts =
-    activeCategory === "all" ? forumPosts : forumPosts.filter((post) => post.category === activeCategory)
-
-  const handleLike = (postId: number) => {
-    if (likedPosts.includes(postId)) {
-      setLikedPosts((prev) => prev.filter((id) => id !== postId))
-      setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes - 1 } : post)))
-    } else {
-      setLikedPosts((prev) => [...prev, postId])
-      setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post)))
+      setCategories(data);
+      if (data.length > 0 && !postCategory) {
+        setPostCategory(data[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast({
+        title: "Error",
+        description:
+          (error as any).message || "Failed to load forum categories",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
-  const handleComment = (postId: number) => {
-    if (!commentText.trim()) return
+  // OPTION 2: Filter posts from backend (more efficient for large datasets)
+  const fetchPostsWithCategoryFilter = async (categoryId?: string) => {
+    setIsLoading(true);
+    try {
+      let query = supabase
+        .from("forum_posts_with_author")
+        .select("*")
+        .order("is_pinned", { ascending: false })
+        .order("created_at", { ascending: false });
 
-    setComments((prev) => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), commentText],
-    }))
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", categoryId);
+      }
 
-    setForumPosts((prev) => prev.map((post) => (post.id === postId ? { ...post, replies: post.replies + 1 } : post)))
+      const { data, error } = await query;
 
-    setCommentText("")
-  }
+      console.log("Requested categoryId:", categoryId);
+      console.log("Returned posts:", data);
 
-  const handleShare = (postId: number) => {
-    const shareLink = `${window.location.origin}/community/post/${postId}`
-    
+      if (error) throw error;
+
+      if (Array.isArray(data)) {
+        setForumPosts(data);
+      } else {
+        setForumPosts([]);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description:
+          "An error occurred while fetching posts. Please check the console log.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // OPTION 3: Enhanced backend filtering with pagination
+  const fetchPostsWithAdvancedFiltering = async (
+    options: {
+      categoryId?: string;
+      limit?: number;
+      offset?: number;
+      sortBy?: "created_at" | "like_count" | "reply_count";
+      sortOrder?: "asc" | "desc";
+    } = {}
+  ) => {
+    setIsLoading(true);
+    try {
+      const {
+        categoryId,
+        limit = 50,
+        offset = 0,
+        sortBy = "created_at",
+        sortOrder = "desc",
+      } = options;
+
+      let query = supabase
+        .from("forum_posts_with_author")
+        .select("*", { count: "exact" })
+        .range(offset, offset + limit - 1);
+
+      // Apply category filter
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", categoryId);
+      }
+
+      // Apply sorting - always prioritize pinned posts first
+      query = query
+        .order("is_pinned", { ascending: false })
+        .order(sortBy, { ascending: sortOrder === "asc" });
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      setForumPosts(data);
+
+      // You can use count for pagination if needed
+      console.log(`Total posts: ${count}`);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      toast({
+        title: "Error",
+        description: (error as any).message || "Failed to load forum posts",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle category change with backend filtering (Option 2)
+  const handleCategoryChange = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    fetchPostsWithCategoryFilter(categoryId);
+  };
+
+  // Fetch user's liked posts
+  const fetchLikedPosts = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("forum_likes")
+        .select("post_id")
+        .eq("user_id", user.id)
+        .is("reply_id", null);
+
+      if (error) throw error;
+
+      setLikedPosts(data.map((like: { post_id: string }) => like.post_id));
+    } catch (error) {
+      console.error("Error fetching liked posts:", error);
+    }
+  };
+
+  // Fetch comments for a post
+  const fetchComments = async (postId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("forum_replies")
+        .select(`*, profiles(name, avatar_url)`)
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      const comments = data.map((comment: any) => ({
+        ...comment,
+        author_name: comment.profiles?.name || "Anonymous",
+        avatar_url: comment.profiles?.avatar_url || "/placeholder.svg",
+      }));
+
+      setExpandedPosts((prev) => {
+        const existing = prev.find((p) => p.postId === postId);
+        if (existing) {
+          return prev.map((p) =>
+            p.postId === postId ? { ...p, comments } : p
+          );
+        }
+        return [...prev, { postId, comments, newComment: "" }];
+      });
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      toast({
+        title: "Error",
+        description: (error as any).message || "Failed to load comments",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Toggle comments visibility
+  const toggleComments = (postId: string) => {
+    setExpandedPosts((prev) => {
+      const isExpanded = prev.some((p) => p.postId === postId);
+      if (isExpanded) {
+        return prev.filter((p) => p.postId !== postId);
+      } else {
+        fetchComments(postId);
+        return [...prev, { postId, comments: [], newComment: "" }];
+      }
+    });
+  };
+
+  // Add a new comment with optimistic updates
+  const handleAddComment = async (postId: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Login Required",
+        description: "You need to login to comment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const expandedPost = expandedPosts.find((p) => p.postId === postId);
+    if (!expandedPost || !expandedPost.newComment.trim()) return;
+
+    // Create temporary comment for optimistic update
+    const tempCommentId = `temp-${Date.now()}`;
+    const tempComment = {
+      id: tempCommentId,
+      post_id: postId,
+      author_id: user.id,
+      author_name: user.user_metadata?.name || "You",
+      avatar_url: user.user_metadata?.avatar_url || "",
+      content: expandedPost.newComment,
+      like_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Optimistically update UI
+    setExpandedPosts((prev) =>
+      prev.map((p) =>
+        p.postId === postId
+          ? {
+              ...p,
+              comments: [...p.comments, tempComment],
+              newComment: "",
+            }
+          : p
+      )
+    );
+
+    // Optimistically update post count
+    setForumPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? { ...post, reply_count: post.reply_count + 1 }
+          : post
+      )
+    );
+
+    try {
+      const { data, error } = await supabase
+        .from("forum_replies")
+        .insert({
+          post_id: postId,
+          author_id: user.id,
+          content: expandedPost.newComment,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Replace temporary comment with real data
+      setExpandedPosts((prev) =>
+        prev.map((p) =>
+          p.postId === postId
+            ? {
+                ...p,
+                comments: p.comments.map((comment) =>
+                  comment.id === tempCommentId
+                    ? {
+                        ...comment,
+                        id: data.id,
+                        created_at: data.created_at,
+                        updated_at: data.updated_at,
+                      }
+                    : comment
+                ),
+              }
+            : p
+        )
+      );
+
+      toast({
+        title: "Comment Added",
+        description: "Your comment was posted successfully",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+
+      // Rollback optimistic updates on error
+      setExpandedPosts((prev) =>
+        prev.map((p) =>
+          p.postId === postId
+            ? {
+                ...p,
+                comments: p.comments.filter((c) => c.id !== tempCommentId),
+                newComment: expandedPost.newComment,
+              }
+            : p
+        )
+      );
+
+      setForumPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? { ...post, reply_count: Math.max(0, post.reply_count - 1) }
+            : post
+        )
+      );
+
+      toast({
+        title: "Error",
+        description: "Failed to post comment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Delete a comment
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      // First get the post ID for this comment
+      const { data: comment, error: fetchError } = await supabase
+        .from("forum_replies")
+        .select("post_id")
+        .eq("id", commentId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Optimistically update UI
+      setExpandedPosts((prev) =>
+        prev.map((postState) => ({
+          ...postState,
+          comments: postState.comments.filter((c) => c.id !== commentId),
+        }))
+      );
+
+      setForumPosts((prev) =>
+        prev.map((post) =>
+          post.id === comment.post_id
+            ? { ...post, reply_count: Math.max(0, post.reply_count - 1) }
+            : post
+        )
+      );
+
+      // Delete the comment
+      const { error } = await supabase
+        .from("forum_replies")
+        .delete()
+        .eq("id", commentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Comment Deleted",
+        description: "Your comment was removed",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast({
+        title: "Error",
+        description: (error as any).message || "Failed to delete comment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Like a comment
+  const handleLikeComment = async (commentId: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Login Required",
+        description: "You need to login to like comments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Check if the user already liked this comment
+      const { data: existingLike, error: checkError } = await supabase
+        .from("forum_likes")
+        .select()
+        .eq("user_id", user.id)
+        .eq("reply_id", commentId)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      const postId = expandedPosts.find((p) =>
+        p.comments.some((c) => c.id === commentId)
+      )?.postId;
+
+      // Optimistically update UI
+      setExpandedPosts((prev) =>
+        prev.map((postState) => {
+          if (!postState.comments.some((c) => c.id === commentId))
+            return postState;
+
+          return {
+            ...postState,
+            comments: postState.comments.map((comment) => {
+              if (comment.id !== commentId) return comment;
+              return {
+                ...comment,
+                like_count: existingLike
+                  ? Math.max(0, comment.like_count - 1)
+                  : comment.like_count + 1,
+              };
+            }),
+          };
+        })
+      );
+
+      if (existingLike) {
+        // Unlike the comment
+        const { error: deleteError } = await supabase
+          .from("forum_likes")
+          .delete()
+          .eq("id", existingLike.id);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Like the comment
+        const { error: insertError } = await supabase
+          .from("forum_likes")
+          .insert({
+            user_id: user.id,
+            reply_id: commentId,
+          });
+
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error("Error liking comment:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to like comment",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle post like
+  const handleLike = async (postId: string, authorId: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Login Required",
+        description: "You need to login to like posts",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const alreadyLiked = likedPosts.includes(postId);
+
+    // Optimistically update UI
+    setForumPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              like_count: alreadyLiked
+                ? Math.max(0, post.like_count - 1)
+                : post.like_count + 1,
+            }
+          : post
+      )
+    );
+    setLikedPosts((prev) =>
+      alreadyLiked ? prev.filter((id) => id !== postId) : [...prev, postId]
+    );
+
+    try {
+      if (alreadyLiked) {
+        // Unlike the post
+        const { error } = await supabase
+          .from("forum_likes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+      } else {
+        // Like the post
+        const { error } = await supabase.from("forum_likes").insert({
+          post_id: postId,
+          user_id: user.id,
+        });
+
+        if (error) throw error;
+
+        if (authorId !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: authorId,
+            title: "New Like on Your Post",
+            message: `${user.user_metadata?.name || "A user"} liked your post`,
+            type: "badge",
+            is_read: false,
+            data: {
+              post_id: postId,
+              action: "like",
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error handling like:", error);
+      // Rollback optimistic update
+      setForumPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                like_count: alreadyLiked
+                  ? post.like_count + 1
+                  : Math.max(0, post.like_count - 1),
+              }
+            : post
+        )
+      );
+      setLikedPosts((prev) =>
+        alreadyLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      toast({
+        title: "Error",
+        description: "Failed to process like",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Create new post
+  const handleCreatePost = async () => {
+    if (
+      !postTitle.trim() ||
+      !postContent.trim() ||
+      !user?.id ||
+      !postCategory
+    ) {
+      toast({
+        title: "Error",
+        description: "Title, content, and category are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("forum_posts").insert({
+        title: postTitle,
+        content: postContent,
+        author_id: user.id,
+        category_id: postCategory,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Post Created",
+        description: "Your post was successfully added",
+        variant: "success",
+      });
+      setPostContent("");
+      setPostTitle("");
+      setNewPostOpen(false);
+
+      // Refresh posts after creating
+      fetchPostsWithCategoryFilter(activeCategory);
+    } catch (error) {
+      console.error("Error creating post:", error);
+      toast({
+        title: "Error",
+        description: (error as any).message || "Failed to create post",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle post sharing
+  const handleSharePost = async (postId: string, postTitle: string) => {
+    const postUrl = `${window.location.origin}/community/post/${postId}`;
+    const shareText = `Check out this post: "${postTitle}"`;
+
     if (navigator.share) {
-      navigator.share({
-        title: 'Check out this post on GreenGrid',
-        text: 'I found this interesting post in the GreenGrid community',
-        url: shareLink,
-      }).catch(err => {
-        console.error('Error sharing:', err)
-        fallbackShare(shareLink)
-      })
+      try {
+        await navigator.share({
+          title: postTitle,
+          text: shareText,
+          url: postUrl,
+        });
+      } catch (err) {
+        console.log("Error sharing:", err);
+        fallbackShare(postUrl, shareText);
+      }
     } else {
-      fallbackShare(shareLink)
+      fallbackShare(postUrl, shareText);
     }
-  }
+  };
 
-  const fallbackShare = (shareLink: string) => {
-    navigator.clipboard.writeText(shareLink)
-    toast({
-      title: "Link Copied!",
-      description: "Post link has been copied to clipboard.",
-      variant: "success",
-    })
-  }
+  const fallbackShare = (url: string, text: string) => {
+    setCurrentSharedPost({ id: url.split("/").pop() || "", title: text });
+    setShareDialogOpen(true);
+  };
 
-  const togglePostExpansion = (postId: number) => {
-    setExpandedPosts(prev => 
-      prev.includes(postId) 
-        ? prev.filter(id => id !== postId) 
-        : [...prev, postId]
-    )
-  }
+  // Initial data loading
+  useEffect(() => {
+    fetchCategories();
+    fetchPostsWithCategoryFilter(activeCategory);
+  }, []);
 
-  const handleCreatePost = () => {
-    if (!postContent.trim() || !postTitle.trim()) return
+  useEffect(() => {
+    const loadData = async () => {
+      await fetchPostsWithCategoryFilter(activeCategory);
+      await fetchLikedPosts();
+    };
+    loadData();
 
-    const newPost = {
-      id: forumPosts.length + 1,
-      author: "You",
-      avatar: "/placeholder.svg",
-      title: postTitle,
-      content: postContent,
-      category: postCategory,
-      replies: 0,
-      likes: 0,
-      time: "Just now",
-    }
+    // Set up real-time subscriptions
+    const postsSubscription = supabase
+      .channel("posts_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "forum_posts" },
+        () => fetchPostsWithCategoryFilter(activeCategory)
+      )
+      .subscribe();
 
-    setForumPosts((prev) => [newPost, ...prev])
-    setNewPostOpen(false)
-    setPostContent("")
-    setPostTitle("")
+    const likesSubscription = supabase
+      .channel("likes_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "forum_likes" },
+        () => {
+          fetchPostsWithCategoryFilter(activeCategory);
+          fetchLikedPosts();
+        }
+      )
+      .subscribe();
 
-    toast({
-      title: "Post Created!",
-      description: "Your post has been published successfully.",
-      variant: "success",
-    })
-  }
+    const commentsSubscription = supabase
+      .channel("comments_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "forum_replies" },
+        (payload: { new: { post_id: string } }) => {
+          if (payload.new?.post_id) {
+            fetchComments(payload.new.post_id);
+          }
+          fetchPostsWithCategoryFilter(activeCategory);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsSubscription);
+      supabase.removeChannel(likesSubscription);
+      supabase.removeChannel(commentsSubscription);
+    };
+  }, [user, activeCategory]);
 
   return (
     <div className="space-y-6">
-      {/* Header and New Post Button */}
+      {/* Header and New Post */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-green-800">Community Forum</h2>
@@ -204,47 +774,42 @@ export function Community() {
         <Dialog open={newPostOpen} onOpenChange={setNewPostOpen}>
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Post
+              <Plus className="h-4 w-4 mr-2" /> New Post
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Post</DialogTitle>
-              <DialogDescription>Share your eco-journey, ask questions, or start a discussion</DialogDescription>
+              <DialogDescription>
+                Share your eco-journey, ask questions, or start a discussion
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Title</label>
-                <Input
-                  placeholder="Enter a descriptive title"
-                  value={postTitle}
-                  onChange={(e) => setPostTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
-                <select
-                  className="w-full p-2 border rounded-md"
-                  value={postCategory}
-                  onChange={(e) => setPostCategory(e.target.value)}
-                >
-                  {forumCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Content</label>
-                <Textarea
-                  placeholder="Share your thoughts, questions, or experiences..."
-                  rows={5}
-                  value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                />
-              </div>
+              <Input
+                value={postTitle}
+                onChange={(e) => setPostTitle(e.target.value)}
+                placeholder="Title"
+                required
+              />
+              <select
+                value={postCategory}
+                onChange={(e) => setPostCategory(e.target.value)}
+                className="w-full p-2 border rounded"
+                required
+              >
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name}
+                  </option>
+                ))}
+              </select>
+              <Textarea
+                value={postContent}
+                onChange={(e) => setPostContent(e.target.value)}
+                placeholder="Content"
+                rows={4}
+                required
+              />
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setNewPostOpen(false)}>
                   Cancel
@@ -252,7 +817,6 @@ export function Community() {
                 <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={handleCreatePost}
-                  disabled={!postTitle.trim() || !postContent.trim()}
                 >
                   Post
                 </Button>
@@ -262,161 +826,415 @@ export function Community() {
         </Dialog>
       </div>
 
-      {/* Forum Categories */}
+      {/* Categories */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card
-          className={`cursor-pointer hover:shadow-md transition-shadow ${
-            activeCategory === "all" ? "border-green-300 bg-green-50" : ""
+          className={`cursor-pointer hover:shadow-md transition-all ${
+            activeCategory === "all" ? "bg-green-50 border-green-300" : ""
           }`}
-          onClick={() => setActiveCategory("all")}
+          onClick={() => handleCategoryChange("all")}
         >
           <CardContent className="p-4 text-center">
             <div className="text-2xl mb-2">🌍</div>
             <h3 className="font-semibold">All Posts</h3>
-            <p className="text-sm text-gray-500">{forumPosts.length} posts</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {forumPosts.length} posts
+            </p>
           </CardContent>
         </Card>
 
-        {forumCategories.map((category) => (
-          <Card
-            key={category.id}
-            className={`cursor-pointer hover:shadow-md transition-shadow ${
-              activeCategory === category.id ? "border-green-300 bg-green-50" : ""
-            }`}
-            onClick={() => setActiveCategory(category.id)}
-          >
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl mb-2">{category.icon}</div>
-              <h3 className="font-semibold">{category.name}</h3>
-              <p className="text-sm text-gray-500">{category.posts} posts</p>
-            </CardContent>
-          </Card>
-        ))}
+        {categories.map((cat) => {
+          const postCount = forumPosts.filter(
+            (p) => p.category_id === cat.id
+          ).length;
+          return (
+            <Card
+              key={cat.id}
+              className={`cursor-pointer hover:shadow-md transition-all ${
+                activeCategory === cat.id ? "bg-green-50 border-green-300" : ""
+              }`}
+              onClick={() => handleCategoryChange(cat.id)}
+              style={{
+                borderColor:
+                  activeCategory === cat.id ? cat.color || "#22c55e" : "",
+              }}
+            >
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl mb-2">{cat.icon || "📝"}</div>
+                <h3 className="font-semibold">{cat.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  {postCount} post{postCount !== 1 ? "s" : ""}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Recent Posts */}
+      {/* Posts */}
       <Card>
         <CardHeader>
           <CardTitle>
             {activeCategory === "all"
               ? "Recent Discussions"
-              : forumCategories.find((c) => c.id === activeCategory)?.name || "Discussions"}
+              : categories.find((c) => c.id === activeCategory)?.name ||
+                "Posts"}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredPosts.map((post) => (
-              <div key={post.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={post.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{post.author[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium text-sm">{post.author}</span>
-                      <span className="text-sm text-gray-500">{post.time}</span>
-                      <Badge
-                        variant="outline"
-                        className={`${
-                          post.category === "tips"
-                            ? "border-blue-300 text-blue-600"
-                            : post.category === "stories"
-                              ? "border-green-300 text-green-600"
-                              : post.category === "questions"
-                                ? "border-purple-300 text-purple-600"
-                                : "border-orange-300 text-orange-600"
-                        }`}
-                      >
-                        {forumCategories.find((c) => c.id === post.category)?.name}
-                      </Badge>
-                    </div>
-                    <h4 className="font-semibold mb-1">{post.title}</h4>
-                    <p className="text-sm text-gray-600 mb-3">{post.content}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <button
-                        className={`flex items-center space-x-1 ${likedPosts.includes(post.id) ? "text-green-600" : "hover:text-green-600"}`}
-                        onClick={() => handleLike(post.id)}
-                      >
-                        <Heart className="h-4 w-4" fill={likedPosts.includes(post.id) ? "currentColor" : "none"} />
-                        <span>{post.likes}</span>
-                      </button>
-                      <button 
-                        className="flex items-center space-x-1 hover:text-blue-600"
-                        onClick={() => togglePostExpansion(post.id)}
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        <span>{post.replies}</span>
-                      </button>
-                      <button
-                        className="flex items-center space-x-1 hover:text-gray-700"
-                        onClick={() => handleShare(post.id)}
-                      >
-                        <Share2 className="h-4 w-4" />
-                        <span>Share</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Comments Section - Only shown when expanded */}
-                {expandedPosts.includes(post.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <div className="mb-4 space-y-3">
-                      {comments[post.id]?.map((comment, i) => (
-                        <div key={i} className="flex items-start space-x-2">
-                          <Avatar className="h-6 w-6 mt-1">
-                            <AvatarImage src="/placeholder.svg" />
-                            <AvatarFallback>U{i+1}</AvatarFallback>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <span className="ml-2">Loading posts...</span>
+            </div>
+          ) : forumPosts.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {activeCategory === "all"
+                ? "No posts available"
+                : `No posts found in ${
+                    categories.find((c) => c.id === activeCategory)?.name ||
+                    "this category"
+                  }`}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {forumPosts.map((post) => {
+                const expandedPost = expandedPosts.find(
+                  (p) => p.postId === post.id
+                );
+                const isExpanded = !!expandedPost;
+
+                return (
+                  <div
+                    key={post.id}
+                    className={`border rounded-lg p-4 hover:bg-gray-50 transition-all ${
+                      post.is_pinned ? "bg-green-50 border-green-200" : ""
+                    }`}
+                  >
+                    {post.is_pinned && (
+                      <div className="text-xs text-green-600 mb-2 flex items-center">
+                        <Pin className="h-3 w-3 mr-1" />
+                        Pinned Post
+                      </div>
+                    )}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage
+                              src={post.avatar_url || "/placeholder.svg"}
+                            />
+                            <AvatarFallback>
+                              {post.author_name?.[0] ?? "U"}
+                            </AvatarFallback>
                           </Avatar>
-                          <div className="bg-gray-100 rounded-lg p-2 px-3 text-sm">
-                            <p className="font-medium text-gray-700">User {i+1}</p>
-                            <p className="text-gray-600">{comment}</p>
+                          <span className="font-medium text-sm">
+                            {post.author_name}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {new Date(post.created_at).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="text-green-600 border-green-300"
+                            style={{
+                              borderColor: post.category_color || "#22c55e",
+                              color: post.category_color || "#22c55e",
+                            }}
+                          >
+                            {post.category_name}
+                          </Badge>
+                        </div>
+                        <h4 className="font-semibold mb-1">{post.title}</h4>
+                        <p className="text-sm text-gray-600 mb-3 whitespace-pre-line">
+                          {post.content}
+                        </p>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <button
+                            onClick={() => handleLike(post.id, post.author_id)}
+                            className={`flex items-center space-x-1 ${
+                              likedPosts.includes(post.id)
+                                ? "text-green-600"
+                                : "hover:text-green-600"
+                            }`}
+                          >
+                            <Heart
+                              className="h-4 w-4"
+                              fill={
+                                likedPosts.includes(post.id)
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                            />
+                            <span>{post.like_count}</span>
+                          </button>
+                          <button
+                            onClick={() => toggleComments(post.id)}
+                            className="flex items-center space-x-1 hover:text-blue-600"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            <span>{post.reply_count}</span>
+                          </button>
+                          <button
+                            onClick={() => handleSharePost(post.id, post.title)}
+                            className="flex items-center space-x-1 hover:text-gray-600"
+                          >
+                            <Share2 className="h-4 w-4" />
+                            <span>Share</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comments section */}
+                    {isExpanded && (
+                      <div className="mt-4 border-t pt-4">
+                        <h4 className="font-medium mb-3">
+                          Comments ({expandedPost.comments.length})
+                        </h4>
+
+                        {/* Comments list */}
+                        <div className="space-y-3 mb-4">
+                          {expandedPost.comments.map((comment) => (
+                            <div
+                              key={comment.id}
+                              className={`flex space-x-3 ${
+                                comment.id.startsWith("temp-")
+                                  ? "opacity-80"
+                                  : ""
+                              }`}
+                            >
+                              <Avatar className="h-8 w-8 mt-1">
+                                <AvatarImage src={comment.avatar_url} />
+                                <AvatarFallback>
+                                  {comment.author_name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="bg-gray-100 rounded-lg p-3">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-medium text-sm">
+                                      {comment.author_name}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(
+                                        comment.created_at
+                                      ).toLocaleDateString()}
+                                    </span>
+                                    {comment.id.startsWith("temp-") && (
+                                      <span className="text-xs text-gray-500">
+                                        Posting...
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-sm">
+                                    {comment.content}
+                                  </p>
+                                </div>
+                                <div className="flex space-x-3 mt-1 text-xs text-gray-500">
+                                  <button
+                                    onClick={() =>
+                                      setReplyingTo(
+                                        replyingTo === comment.id
+                                          ? null
+                                          : comment.id
+                                      )
+                                    }
+                                    className="hover:text-blue-600"
+                                    disabled={comment.id.startsWith("temp-")}
+                                  >
+                                    Reply
+                                  </button>
+                                  <button
+                                    className="flex items-center space-x-1 hover:text-green-600"
+                                    onClick={() =>
+                                      handleLikeComment(comment.id)
+                                    }
+                                    disabled={comment.id.startsWith("temp-")}
+                                  >
+                                    <Heart className="h-3 w-3" />
+                                    <span>{comment.like_count}</span>
+                                  </button>
+                                  {comment.author_id === user?.id && (
+                                    <button
+                                      className="hover:text-red-600"
+                                      onClick={() =>
+                                        handleDeleteComment(comment.id)
+                                      }
+                                      disabled={comment.id.startsWith("temp-")}
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Reply form */}
+                                {replyingTo === comment.id && (
+                                  <div className="mt-2 ml-4">
+                                    <Textarea
+                                      placeholder="Write your reply..."
+                                      className="mb-2"
+                                    />
+                                    <div className="flex space-x-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() =>
+                                          handleAddComment(post.id)
+                                        }
+                                      >
+                                        Post Reply
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setReplyingTo(null)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add comment form */}
+                        <div className="flex space-x-3">
+                          <Avatar className="h-8 w-8 mt-1">
+                            <AvatarImage
+                              src={
+                                user?.user_metadata?.avatar_url ||
+                                "/placeholder.svg"
+                              }
+                            />
+                            <AvatarFallback>
+                              {user?.user_metadata?.name?.[0] || "Y"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <Textarea
+                              value={expandedPost.newComment}
+                              onChange={(e) =>
+                                setExpandedPosts((prev) =>
+                                  prev.map((p) =>
+                                    p.postId === post.id
+                                      ? { ...p, newComment: e.target.value }
+                                      : p
+                                  )
+                                )
+                              }
+                              placeholder="Add a comment..."
+                              className="mb-2"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleAddComment(post.id)}
+                              disabled={
+                                !expandedPost.newComment.trim() ||
+                                expandedPost.comments.some((c) =>
+                                  c.id.startsWith("temp-")
+                                )
+                              }
+                            >
+                              Post Comment
+                            </Button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    <div className="flex mt-2">
-                      <Input
-                        placeholder="Add a comment..."
-                        className="text-sm mr-2"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && handleComment(post.id)}
-                      />
-                      <Button size="sm" onClick={() => handleComment(post.id)}>
-                        Post
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Reply */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <div className="flex items-start space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-              <Input placeholder="Share your thoughts or ask a question..." className="bg-white" />
-              <div className="flex justify-end mt-2">
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                  <Send className="h-4 w-4 mr-2" />
-                  Post
-                </Button>
-              </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Share Dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share this post</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-4 py-4">
+            <button
+              onClick={() =>
+                window.open(
+                  `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                    `${window.location.origin}/community/post/${currentSharedPost?.id}`
+                  )}`,
+                  "_blank"
+                )
+              }
+              className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-gray-100"
+            >
+              <Facebook className="h-6 w-6 text-blue-600" />
+              <span className="mt-2 text-sm">Facebook</span>
+            </button>
+
+            <button
+              onClick={() =>
+                window.open(
+                  `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                    currentSharedPost?.title || ""
+                  )}&url=${encodeURIComponent(
+                    `${window.location.origin}/community/post/${currentSharedPost?.id}`
+                  )}`,
+                  "_blank"
+                )
+              }
+              className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-gray-100"
+            >
+              <Twitter className="h-6 w-6 text-blue-400" />
+              <span className="mt-2 text-sm">Twitter</span>
+            </button>
+
+            <button
+              onClick={() =>
+                window.open(
+                  `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(
+                    `${window.location.origin}/community/post/${currentSharedPost?.id}`
+                  )}&title=${encodeURIComponent(
+                    currentSharedPost?.title || ""
+                  )}`,
+                  "_blank"
+                )
+              }
+              className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-gray-100"
+            >
+              <Linkedin className="h-6 w-6 text-blue-700" />
+              <span className="mt-2 text-sm">LinkedIn</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `${window.location.origin}/community/post/${currentSharedPost?.id}`
+                );
+                toast({
+                  title: "Link Copied",
+                  description: "Post link copied to clipboard",
+                });
+                setShareDialogOpen(false);
+              }}
+              className="flex flex-col items-center justify-center p-3 rounded-lg hover:bg-gray-100"
+            >
+              <Copy className="h-6 w-6 text-gray-600" />
+              <span className="mt-2 text-sm">Copy Link</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Upcoming Events */}
       <Card>
         <CardHeader>
@@ -433,21 +1251,21 @@ export function Community() {
                 date: "July 15, 2025",
                 location: "Central Park, Delhi",
                 organizer: "Green Delhi Initiative",
-                participants: 45,
+                participants: 14,
               },
               {
                 title: "Plastic-Free Workshop",
                 date: "July 18, 2025",
                 location: "Online Event",
                 organizer: "Zero Waste India",
-                participants: 128,
+                participants: 26,
               },
               {
                 title: "Solar Energy Awareness Session",
                 date: "July 22, 2025",
                 location: "Tech Hub, Bangalore",
                 organizer: "Renewable Energy Forum",
-                participants: 67,
+                participants: 21,
               },
             ].map((event, index) => (
               <div key={index} className="border border-green-200 rounded-lg p-4 bg-green-50">
@@ -457,7 +1275,7 @@ export function Community() {
                     <p className="text-sm text-green-600">by {event.organizer}</p>
                   </div>
                   <Badge variant="outline" className="text-green-700 border-green-300">
-                    {event.participants} joined
+                    {event.participants} in waiting..
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-4 text-sm text-green-600 mb-3">
@@ -470,8 +1288,19 @@ export function Community() {
                     <span>{event.location}</span>
                   </div>
                 </div>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                  Join Event
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() =>
+                    toast({
+                      title: "Coming Soon!",
+                      description: "Stay tuned for event participation.",
+                      className:
+                        "bg-green-50 text-green-800 border border-green-200 shadow-md rounded-lg p-4",
+                    })
+                  }
+                >
+                  Coming Soon!
                 </Button>
               </div>
             ))}
@@ -479,5 +1308,5 @@ export function Community() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

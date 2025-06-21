@@ -17,6 +17,7 @@ const supabase = createClientComponentClient({
 })
 
 interface User {
+  user_metadata: any
   id: string
   name: string
   email: string
@@ -88,6 +89,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               total_points: profile.total_points || 0,
               level: profile.level || 1,
               rank: profile.rank || 0,
+              user_metadata: session.user.user_metadata || {},
             })
           } else {
             const userData = {
@@ -100,6 +102,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               avatar_url: session.user.user_metadata?.avatar_url || null,
               total_points: 0,
               level: 1,
+              user_metadata: session.user.user_metadata || {},
             }
 
             const { error: insertError } = await supabase
