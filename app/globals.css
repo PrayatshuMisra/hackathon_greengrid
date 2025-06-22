@@ -685,5 +685,16 @@
 
 @import "leaflet/dist/leaflet.css";
 
+.animate-glow-yellow { animation: glow-yellow 2s infinite alternate; }
+.animate-glow-gray { animation: glow-gray 2s infinite alternate; }
+.animate-glow-orange { animation: glow-orange 2s infinite alternate; }
+@keyframes glow-yellow { 0% { box-shadow: 0 0 0 0 #fde68a; } 100% { box-shadow: 0 0 32px 8px #fde68a; } }
+@keyframes glow-gray { 0% { box-shadow: 0 0 0 0 #d1d5db; } 100% { box-shadow: 0 0 32px 8px #d1d5db; } }
+@keyframes glow-orange { 0% { box-shadow: 0 0 0 0 #fdba74; } 100% { box-shadow: 0 0 32px 8px #fdba74; } }
 
-
+.dark .animate-glow-yellow { animation: glow-yellow-dark 2s infinite alternate; }
+.dark .animate-glow-gray { animation: glow-gray-dark 2s infinite alternate; }
+.dark .animate-glow-orange { animation: glow-orange-dark 2s infinite alternate; }
+@keyframes glow-yellow-dark { 0% { box-shadow: 0 0 0 0 #fde68a99; } 100% { box-shadow: 0 0 32px 8px #fde68aee; } }
+@keyframes glow-gray-dark { 0% { box-shadow: 0 0 0 0 #d1d5db99; } 100% { box-shadow: 0 0 32px 8px #d1d5dbff; } }
+@keyframes glow-orange-dark { 0% { box-shadow: 0 0 0 0 #fdba7499; } 100% { box-shadow: 0 0 32px 8px #fdba74ee; } }

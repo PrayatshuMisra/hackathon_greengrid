@@ -303,7 +303,7 @@ export function Leaderboard() {
                 </div>
               ) : (
               <motion.div className="space-y-3" variants={{ show: { transition: { staggerChildren: 0.05 } } }}>
-                {leaderboardData.map((item) => (
+                {leaderboardData.map((item, idx) => (
                   <motion.div
                     key={item.id}
                     variants={fadeInUp}
@@ -315,7 +315,7 @@ export function Leaderboard() {
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                         item.rank <= 3 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-600"
                       }`}>
-                        {item.rank || '-'}
+                        {item.rank && item.rank > 0 ? item.rank : (idx + 1)}
                       </div>
                       <div>
                         <h4 className="font-semibold">{item.name}</h4>

@@ -70,6 +70,40 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    const fetchOrCreateProfile = async (sessionUser: any, retries = 3) => {
+      let profile, profileError;
+      for (let attempt = 0; attempt < retries; attempt++) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", sessionUser.id)
+          .single();
+        profile = data;
+        profileError = error;
+        if (profile && !profileError) break;
+        // If not found, try to create
+        if (attempt === 0) {
+          const userData = {
+            id: sessionUser.id,
+            email: sessionUser.email || "",
+            name:
+              sessionUser.user_metadata?.full_name ||
+              sessionUser.user_metadata?.name ||
+              sessionUser.email?.split("@")[0] ||
+              "User",
+            avatar_url: sessionUser.user_metadata?.avatar_url || null,
+            total_points: 0,
+            level: 1,
+            user_metadata: sessionUser.user_metadata || {},
+          };
+          await supabase.from("profiles").insert(userData);
+        }
+        // Wait before retrying
+        await new Promise((res) => setTimeout(res, 1200));
+      }
+      return profile;
+    };
+
     const getUser = async () => {
       setLoading(true)
       try {
@@ -111,44 +145,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           console.log("Session user found:", session.user);
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .single()
-
-          console.log("Profile fetch result:", { profile, error });
-
-          if (error && error.code !== "PGRST116") {
-            console.error("Error fetching user profile:", error)
-            throw error
-          }
-
+          // Always fetch or create profile robustly
+          const profile = await fetchOrCreateProfile(session.user, 3);
           if (profile) {
-            console.log("Setting user from existing profile:", profile);
             setUser({
-              id: profile.id,
-              name: profile.name,
-              email: profile.email,
-              avatar_url: profile.avatar_url,
-              team_id: profile.team_id,
-              location: {
-                lat: profile.latitude || 28.6139,
-                lng: profile.longitude || 77.209,
-                city: profile.city || "Delhi",
-              },
-              total_points: profile.total_points || 0,
-              level: profile.level || 1,
-              rank: profile.rank || 0,
+              ...profile,
               user_metadata: session.user.user_metadata || {},
+              isDemo: false,
             })
           } else {
-
             console.log("Profile doesn't exist, creating new profile");
             const userData = {
               id: session.user.id,
               email: session.user.email || "",
               name:
+                session.user.user_metadata?.full_name ||
                 session.user.user_metadata?.name ||
                 session.user.email?.split("@")[0] ||
                 "User",
@@ -166,6 +177,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
             if (insertError) {
               console.error("Error creating user profile:", insertError)
+              setUser({
+                id: session.user.id,
+                email: session.user.email || "",
+                name: "User",
+                avatar_url: null,
+                total_points: 0,
+                level: 1,
+                user_metadata: session.user.user_metadata || {},
+                team_id: null,
+                location: {
+                  lat: 28.6139,
+                  lng: 77.209,
+                  city: "Delhi",
+                },
+                rank: 0,
+                isDemo: false,
+              })
             } else {
               console.log("Setting user from newly created profile");
               setUser({
@@ -177,6 +205,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   city: "Delhi",
                 },
                 rank: 0,
+                isDemo: false,
               })
             }
           }
