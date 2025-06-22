@@ -28,7 +28,7 @@ import {
 import { useApp } from "@/app/providers"
 import { useRealtime } from "@/lib/realtime"
 import { useToast } from "@/hooks/use-toast"
-import { Users, Plus, Link, Crown, UserMinus, Settings, Share2, Copy, CheckCircle, QrCode, Upload } from "lucide-react"
+import { Users, Plus, Link, Crown, UserMinus, Settings, Share2, Copy, CheckCircle, QrCode, Upload, AlertCircle } from "lucide-react"
 
 export function TeamManagement() {
   const [isCreating, setIsCreating] = useState(false)
@@ -108,6 +108,17 @@ export function TeamManagement() {
       });
       return;
     }
+    
+    // Handle demo users
+    if (user.isDemo) {
+      toast({
+        title: "Demo Mode",
+        description: "Team creation is not available in demo mode. Please create a real account to create teams.",
+        variant: "default",
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
       const inviteCode = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -372,6 +383,17 @@ export function TeamManagement() {
       });
       return;
     }
+    
+    // Handle demo users
+    if (user.isDemo) {
+      toast({
+        title: "Demo Mode",
+        description: "Team functionality is not available in demo mode. Please create a real account to join teams.",
+        variant: "default",
+      });
+      return;
+    }
+    
     if (user.team_id) {
       toast({
         title: "Already in a team",
@@ -532,6 +554,17 @@ export function TeamManagement() {
         <CardHeader>
           <CardTitle className="text-2xl">Team Management</CardTitle>
           <CardDescription>Manage your team settings and members.</CardDescription>
+          {user?.isDemo && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm font-medium text-yellow-800">Demo Mode</span>
+              </div>
+              <p className="text-xs text-yellow-700 mt-1">
+                Team functionality is limited in demo mode. Create a real account to join and create teams.
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="grid gap-6">
           {/* Team Info or Join/Create UI */}

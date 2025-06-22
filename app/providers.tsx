@@ -9,6 +9,8 @@ import { GeolocationProvider } from "@/lib/geolocation"
 import { AIProvider } from "@/lib/ai-verification"
 import { ToastProvider } from "@/components/ui/toast"
 import { ThemeProvider } from "@/contexts/theme-context"
+import { useToast } from "@/hooks/use-toast"
+import { useRealtime } from "@/lib/realtime"
 
 const supabase = createClientComponentClient({
   supabaseUrl: "https://lenuuxzhvadftlfbozox.supabase.co",
@@ -27,6 +29,7 @@ interface User {
   total_points: number
   level: number
   rank: number
+  isDemo?: boolean
 }
 
 interface AppContextType {
@@ -45,11 +48,24 @@ const AppContext = createContext<AppContextType>({
 
 export const useApp = () => useContext(AppContext)
 
+// Helper function to get cookie value
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   const signOut = async () => {
+    // Remove demo cookie if it exists
+    if (typeof document !== 'undefined') {
+      document.cookie = "demo=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
     await supabase.auth.signOut()
     setUser(null)
   }
@@ -58,6 +74,33 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const getUser = async () => {
       setLoading(true)
       try {
+        // Check for demo user first
+        const isDemo = getCookie('demo') === 'true'
+        
+        if (isDemo) {
+          // Create demo user object
+          const demoUser: User = {
+            id: 'demo-user-id',
+            name: 'Demo User',
+            email: 'demo@greengrid.com',
+            avatar_url: null,
+            team_id: null,
+            location: {
+              lat: 28.6139,
+              lng: 77.209,
+              city: "Delhi",
+            },
+            total_points: 1250,
+            level: 3,
+            rank: 15,
+            user_metadata: {},
+            isDemo: true,
+          }
+          setUser(demoUser)
+          setLoading(false)
+          return
+        }
+
         const {
           data: { session },
         } = await supabase.auth.getSession()
@@ -149,6 +192,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Real-time listener for profile updates (only for real users, not demo)
+  useEffect(() => {
+    if (!user?.id || user.isDemo) return;
+
+    const profileChannel = supabase
+      .channel(`profile-updates-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          setUser((prevUser: any) => ({ ...prevUser, ...payload.new }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileChannel);
+    };
+  }, [user?.id, user?.isDemo, supabase]);
 
   return (
     <ThemeProvider>

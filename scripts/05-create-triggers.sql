@@ -55,3 +55,8 @@ CREATE TRIGGER trigger_forum_replies_updated_at
 CREATE TRIGGER trigger_rewards_updated_at
   BEFORE UPDATE ON rewards
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger to create a profile when a new user signs up
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();

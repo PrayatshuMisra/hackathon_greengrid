@@ -239,57 +239,106 @@ export function Dashboard() {
   const handleVerificationComplete = async (result: any) => {
     if (result.success && selectedChallenge) {
       try {
-        // Update challenge progress in DB
-        const { data, error } = await supabase
-          .from("user_challenges")
-          .update({ progress: Math.min(100, (selectedChallenge.progress || 0) + 20) })
-          .eq("id", selectedChallenge.id)
-          .select()
-          .single();
-        
-        if (error) throw error;
+        const currentProgress = selectedChallenge.progress || 0;
+        const newProgress = Math.min(100, currentProgress + 20); // Assuming 20% progress per verification
+        const challengePoints = selectedChallenge.challenges?.points || 0;
 
-        if (data) {
-          setActiveChallenges((prev) =>
-            prev.map((challenge) =>
-              challenge.id === selectedChallenge.id
-                ? { ...challenge, progress: data.progress }
-                : challenge
-            )
-          );
+        if (newProgress >= 100) {
+          // --- CHALLENGE COMPLETED ---
+          
+          // 1. Final update to user_challenges
+          await supabase
+            .from("user_challenges")
+            .update({
+              progress: 100,
+              status: "completed",
+              completed_at: new Date().toISOString(),
+              points_earned: challengePoints,
+            })
+            .eq("id", selectedChallenge.id);
 
-          // Add to recent activity on successful verification
+          // 2. Call DB function to update user and team points
+          if (user?.id && challengePoints > 0) {
+            const { error: pointsError } = await supabase.rpc(
+              "update_user_points",
+              {
+                user_id: user.id,
+                points_to_add: challengePoints,
+              }
+            );
+            if (pointsError) throw pointsError;
+          }
+
+          // 3. Log completion activity
           if (user?.id) {
             await supabase.from("user_activity").insert({
               user_id: user.id,
               activity_type: "challenge",
-              description: `Proof verified for challenge: "${selectedChallenge.challenges?.title}"`,
+              description: `Completed: "${selectedChallenge.challenges?.title}" & earned ${challengePoints} points!`,
+              points_earned: challengePoints,
               related_id: selectedChallenge.challenges?.id,
               related_type: "challenge",
             });
           }
 
-          if (data.progress === 100) {
-            toast({
-              title: "Challenge Completed!",
-              description: `You've earned ${selectedChallenge.challenges?.points || 0} EcoPoints! 🎉`,
-              variant: "success",
-            });
-            router.push(
-              `/certificate?challenge=${encodeURIComponent(
-                selectedChallenge.challenges?.title || ""
-              )}&points=${selectedChallenge.challenges?.points || 0}`
+          // 4. Show toast and redirect
+          toast({
+            title: "Challenge Completed!",
+            description: `You've earned ${challengePoints} EcoPoints! 🎉`,
+            variant: "success",
+          });
+          
+          router.push(
+            `/certificate?challenge=${encodeURIComponent(
+              selectedChallenge.challenges?.title || ""
+            )}&points=${challengePoints}`
+          );
+
+        } else {
+          // --- CHALLENGE IN PROGRESS ---
+
+          // 1. Update progress in user_challenges
+          const { data, error } = await supabase
+            .from("user_challenges")
+            .update({ progress: newProgress })
+            .eq("id", selectedChallenge.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          // 2. Update local state for active challenges
+          if (data) {
+            setActiveChallenges((prev) =>
+              prev.map((challenge) =>
+                challenge.id === selectedChallenge.id
+                  ? { ...challenge, progress: data.progress }
+                  : challenge
+              )
             );
-          } else {
-            toast({
-              title: "Verification Successful!",
-              description:
-                "Your challenge proof has been verified and your progress has been updated.",
-              variant: "success",
+          }
+          
+          // 3. Log progress activity
+          if (user?.id) {
+            await supabase.from("user_activity").insert({
+              user_id: user.id,
+              activity_type: "challenge",
+              description: `Proof verified for: "${selectedChallenge.challenges?.title}"`,
+              related_id: selectedChallenge.challenges?.id,
+              related_type: "challenge",
             });
           }
+
+          // 4. Show progress toast
+          toast({
+            title: "Verification Successful!",
+            description: "Your challenge proof has been verified and your progress has been updated.",
+            variant: "success",
+          });
         }
+        
         setSubmitProofOpen(false);
+
       } catch (error: any) {
         toast({
           title: "Error",

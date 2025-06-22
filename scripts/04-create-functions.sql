@@ -208,3 +208,19 @@ BEGIN
   RETURN true;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Function to handle new user registration
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Insert a new profile for the new user
+  INSERT INTO public.profiles (id, email, name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'full_name', -- Assumes 'full_name' is passed in metadata on signup
+    NEW.raw_user_meta_data->>'avatar_url'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
