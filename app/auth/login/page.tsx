@@ -52,8 +52,11 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
+    console.log("Login attempt with email:", email);
+
     try {
       if (email === "demo@greengrid.com" && password === "demo123") {
+        console.log("Demo login detected");
         toast({
           title: "Demo Login Successful",
           description: "Welcome to GreenGrid! You're logged in with the demo account.",
@@ -66,14 +69,23 @@ export default function LoginPage() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      console.log("Attempting Supabase login");
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      console.log("Supabase login result:", { data, error });
 
       if (error) {
+        console.error("Supabase login error:", error);
         if (error.message.includes("Invalid login credentials")) {
           throw new Error("Invalid email or password. Please try again.");
         }
+        if (error.message.includes("Email not confirmed")) {
+          throw new Error("Please check your email and click the verification link before signing in.");
+        }
         throw error;
       }
+
+      console.log("Login successful, user data:", data);
 
       toast({
         title: "Login successful",

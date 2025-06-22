@@ -367,6 +367,10 @@ export function TeamManagement() {
   }
 
   const handleJoinTeam = async (teamCode: string) => {
+    console.log("handleJoinTeam called with teamCode:", teamCode);
+    console.log("Current user object:", user);
+    console.log("User loading state:", loading);
+    
     if (!teamCode) {
       toast({
         title: "Missing information",
@@ -376,6 +380,7 @@ export function TeamManagement() {
       return;
     }
     if (!user) {
+      console.log("User is null, showing error message");
       toast({
         title: "Not logged in",
         description: "You must be logged in to join a team.",
@@ -523,6 +528,125 @@ export function TeamManagement() {
     }
   }
 
+  // Debug function to check authentication state
+  const checkAuthState = async () => {
+    console.log("Checking authentication state...");
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log("Session check result:", { session, error });
+      
+      if (session?.user) {
+        console.log("Session user found:", session.user);
+        
+        // Check if profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+        
+        console.log("Profile check result:", { profile, profileError });
+        
+        if (profile) {
+          toast({
+            title: "Profile Found",
+            description: `Profile exists for ${profile.email}`,
+            variant: "success",
+          });
+        } else {
+          toast({
+            title: "Profile Missing",
+            description: "No profile found for this user. Click 'Create Profile' to fix this.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "No Session",
+          description: "No active session found. Please log in first.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Auth check error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check authentication state",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Function to manually create a user profile
+  const createUserProfile = async () => {
+    console.log("Creating user profile...");
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        toast({
+          title: "No Session",
+          description: "Please log in first before creating a profile.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userData = {
+        id: session.user.id,
+        email: session.user.email || "",
+        name: session.user.user_metadata?.full_name || 
+              session.user.user_metadata?.name || 
+              session.user.email?.split("@")[0] || 
+              "User",
+        avatar_url: session.user.user_metadata?.avatar_url || null,
+        total_points: 0,
+        level: 1,
+        team_id: null,
+        latitude: 28.6139,
+        longitude: 77.209,
+        city: "Delhi",
+        rank: 0,
+      };
+
+      console.log("Creating profile with data:", userData);
+
+      const { error: insertError } = await supabase
+        .from("profiles")
+        .insert(userData);
+
+      if (insertError) {
+        console.error("Profile creation error:", insertError);
+        toast({
+          title: "Error",
+          description: `Failed to create profile: ${insertError.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Profile created successfully");
+        toast({
+          title: "Profile Created",
+          description: "User profile created successfully. Please refresh the page.",
+          variant: "success",
+        });
+        
+        // Refresh the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Profile creation error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create user profile",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Handle team image upload
   const handleTeamImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !teamInfo || !isAdmin) return
@@ -565,6 +689,45 @@ export function TeamManagement() {
               </p>
             </div>
           )}
+          
+          {/* Debug Information */}
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-800 mb-2">Debug Info:</h4>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p>User: {user ? `${user.name} (${user.email})` : 'null'}</p>
+              <p>User ID: {user?.id || 'null'}</p>
+              <p>Is Demo: {user?.isDemo ? 'Yes' : 'No'}</p>
+              <p>Loading: {loading ? 'Yes' : 'No'}</p>
+              <p>Team ID: {user?.team_id || 'null'}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2"
+              onClick={() => {
+                console.log("Manual refresh triggered");
+                window.location.reload();
+              }}
+            >
+              Refresh Auth State
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2 ml-2"
+              onClick={checkAuthState}
+            >
+              Check Auth State
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2 ml-2"
+              onClick={createUserProfile}
+            >
+              Create Profile
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-6">
           {/* Team Info or Join/Create UI */}

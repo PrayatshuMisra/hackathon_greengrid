@@ -74,10 +74,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const getUser = async () => {
       setLoading(true)
       try {
+        console.log("getUser function called");
+        
         // Check for demo user first
         const isDemo = getCookie('demo') === 'true'
+        console.log("Demo cookie check:", isDemo);
         
         if (isDemo) {
+          console.log("Creating demo user object");
           // Create demo user object
           const demoUser: User = {
             id: 'demo-user-id',
@@ -105,12 +109,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
           data: { session },
         } = await supabase.auth.getSession()
 
+        console.log("Supabase session:", session);
+
         if (session?.user) {
+          console.log("Session user found:", session.user);
           const { data: profile, error } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", session.user.id)
             .single()
+
+          console.log("Profile fetch result:", { profile, error });
 
           if (error && error.code !== "PGRST116") {
             console.error("Error fetching user profile:", error)
@@ -118,6 +127,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           }
 
           if (profile) {
+            console.log("Setting user from existing profile:", profile);
             setUser({
               id: profile.id,
               name: profile.name,
@@ -135,6 +145,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
               user_metadata: session.user.user_metadata || {},
             })
           } else {
+            // Profile doesn't exist, create one
+            console.log("Profile doesn't exist, creating new profile");
             const userData = {
               id: session.user.id,
               email: session.user.email || "",
@@ -152,9 +164,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
               .from("profiles")
               .insert(userData)
 
+            console.log("Profile creation result:", { insertError });
+
             if (insertError) {
               console.error("Error creating user profile:", insertError)
             } else {
+              console.log("Setting user from newly created profile");
               setUser({
                 ...userData,
                 team_id: null,
@@ -168,6 +183,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
+          console.log("No session found, setting user to null");
           setUser(null)
         }
       } catch (error) {
@@ -183,6 +199,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state change:", event, session);
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         getUser()
       } else if (event === "SIGNED_OUT") {
