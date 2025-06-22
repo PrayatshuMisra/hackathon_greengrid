@@ -88,28 +88,26 @@ export default function ChallengesAdmin() {
 
   const handleCreateChallenge = async (formData: Partial<Challenge>) => {
     try {
-      const res = await fetch("/api/admin/update-challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", data: formData })
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Unknown error")
+      const { data, error } = await supabase
+        .from("challenges")
+        .insert([formData])
+        .select();
+      if (error) throw error;
       toast({
         title: "Challenge created",
         description: "The challenge has been created successfully",
-      })
-      setIsCreateDialogOpen(false)
-      fetchChallenges()
+      });
+      setIsCreateDialogOpen(false);
+      fetchChallenges();
     } catch (error: unknown) {
-      console.error("Error creating challenge:", error)
+      console.error("Error creating challenge:", error);
       toast({
         title: "Error creating challenge",
         description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleUpdateChallenge = async (formData: Partial<Challenge>) => {
     if (!selectedChallenge) return
