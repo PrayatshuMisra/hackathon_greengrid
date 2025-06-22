@@ -27,6 +27,86 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 
+interface ProfileData {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
+  bio?: string;
+  city?: string;
+  country?: string;
+  total_points: number;
+  level: number;
+  rank?: number;
+  team_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface UserStats {
+  total_points: number;
+  level: number;
+  rank?: number;
+  challenges_completed: number;
+  badges_earned: number;
+  events_attended: number;
+  co2_saved: number;
+  water_saved: number;
+  plastic_avoided: number;
+  trees_planted: number;
+}
+
+interface Badge {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  rarity: 'Common' | 'Rare' | 'Epic' | 'Legendary';
+  earned: boolean;
+  earned_at?: string;
+}
+
+interface CompletedChallenge {
+  id: string;
+  title: string;
+  description: string;
+  points: number;
+  completed_at: string;
+  impact_description?: string;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  city: string;
+  total_points: number;
+  rank?: number;
+  member_count: number;
+}
+
+interface UserBadge {
+  earned_at: string;
+  badges: {
+    id: string;
+    name: string;
+    description?: string;
+    icon: string;
+    rarity: string;
+  };
+}
+
+interface UserChallenge {
+  completed_at: string;
+  points_earned: number;
+  challenges: {
+    id: string;
+    title: string;
+    description: string;
+    points: number;
+  };
+}
+
 export function Profile() {
   const [mailModalOpen, setMailModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -41,123 +121,182 @@ export function Profile() {
   const [loading, setLoading] = useState(false)
   const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
   const [downloadingData, setDownloadingData] = useState(false)
-
-  const [profileData, setProfileData] = useState({
-    name: user?.name || "Salman Khan",
-    email: user?.email || "salman@email.com",
-    location: user?.location?.city?.toLowerCase() || "delhi",
-    team: "ecowarriors",
-    bio: "Passionate about sustainable living and climate action. Love cycling and growing my own vegetables!",
-    avatar: user?.avatar_url || "/placeholder.svg",
-  })
-
-  const supabase = createClientComponentClient();
   const [userEmail, setUserEmail] = useState('');
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const [completedChallenges, setCompletedChallenges] = useState<CompletedChallenge[]>([]);
+  const [userTeam, setUserTeam] = useState<Team | null>(null);
+  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  const userStats = {
-    totalPoints: 2340,
-    rank: 156,
-    challengesCompleted: 12,
-    co2Saved: 45.6,
-    waterSaved: 234,
-    plasticAvoided: 12.3,
-    treesPlanted: 3,
-    level: 1,
-    nextLevelProgress: 73,
-  }
-
-  const badges = [
-    { name: "Plastic-Free Warrior", icon: "🛡️", earned: true, rarity: "Epic" },
-    { name: "Energy Saver", icon: "⚡", earned: true, rarity: "Rare" },
-    { name: "Water Guardian", icon: "💧", earned: false, rarity: "Legendary" },
-    { name: "Green Commuter", icon: "🚲", earned: true, rarity: "Common" },
-    { name: "Compost Champion", icon: "🌱", earned: false, rarity: "Rare" },
-    { name: "Tree Planter", icon: "🌳", earned: true, rarity: "Epic" },
-  ]
-
-  const completedChallenges = [
-    {
-      title: "Plastic-Free Week",
-      date: "Nov 15, 2024",
-      points: 150,
-      impact: "5kg plastic saved",
-      badge: "Plastic-Free Warrior",
-    },
-    {
-      title: "Bike to Work Challenge",
-      date: "Oct 28, 2024",
-      points: 200,
-      impact: "12kg CO₂ reduced",
-      badge: "Green Commuter",
-    },
-    {
-      title: "Tree Planting Event",
-      date: "Oct 10, 2024",
-      points: 100,
-      impact: "3 trees planted",
-      badge: "Tree Planter",
-    },
-    {
-      title: "Energy Saving Month",
-      date: "Sep 30, 2024",
-      points: 300,
-      impact: "25kWh saved",
-      badge: "Energy Saver",
-    },
-  ]
-
+  const supabaseClient = createClientComponentClient();
   const impactSummaryRef = useRef<HTMLDivElement>(null)
   const badgeCollectionRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    if (user?.id) {
+      fetchUserData();
+      fetchUserEmail();
+    }
+  }, [user?.id]);
+
+  const fetchUserEmail = async () => {
+    const { data: { user: authUser } } = await supabaseClient.auth.getUser();
+    if (authUser?.email) {
+      setUserEmail(authUser.email);
+    }
+  };
+
+  const fetchUserData = async () => {
+    if (!user?.id) return;
+    
+    setIsLoading(true);
+    try {
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      setProfileData(profile);
+
+      const { data: stats, error: statsError } = await supabaseClient
+        .from('user_dashboard_stats')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (statsError) throw statsError;
+      setUserStats(stats);
+
+      const { data: userBadges, error: badgesError } = await supabaseClient
+        .from('user_badges')
+        .select(`
+          earned_at,
+          badges (
+            id,
+            name,
+            description,
+            icon,
+            rarity
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (badgesError) throw badgesError;
+
+      const { data: allBadges, error: allBadgesError } = await supabaseClient
+        .from('badges')
+        .select('*');
+
+      if (allBadgesError) throw allBadgesError;
+
+      const combinedBadges = allBadges.map(badge => ({
+        ...badge,
+        earned: userBadges.some((ub: any) => ub.badges?.id === badge.id),
+        earned_at: userBadges.find((ub: any) => ub.badges?.id === badge.id)?.earned_at
+      }));
+
+      setBadges(combinedBadges);
+
+      const { data: challenges, error: challengesError } = await supabaseClient
+        .from('user_challenges')
+        .select(`
+          completed_at,
+          points_earned,
+          challenges (
+            id,
+            title,
+            description,
+            points
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false });
+
+      if (challengesError) throw challengesError;
+
+      const formattedChallenges = challenges.map((challenge: any) => ({
+        id: challenge.challenges.id,
+        title: challenge.challenges.title,
+        description: challenge.challenges.description,
+        points: challenge.points_earned,
+        completed_at: challenge.completed_at,
+        impact_description: `Earned ${challenge.points_earned} points`
+      }));
+
+      setCompletedChallenges(formattedChallenges);
+
+      if (profile.team_id) {
+        const { data: team, error: teamError } = await supabaseClient
+          .from('teams')
+          .select('*')
+          .eq('id', profile.team_id)
+          .single();
+
+        if (!teamError) {
+          setUserTeam(team);
+        }
+      }
+
+      const { data: teams, error: teamsError } = await supabaseClient
+        .from('teams')
+        .select('*')
+        .order('total_points', { ascending: false });
+
+      if (!teamsError) {
+        setAvailableTeams(teams);
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching user data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file || !user?.id) return
 
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${user?.id}-${Math.random()}.${fileExt}`
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`
       const filePath = `${fileName}`
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabaseClient.storage
         .from('avatars')
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = supabaseClient.storage
         .from('avatars')
         .getPublicUrl(filePath)
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseClient
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', user?.id)
+        .eq('id', user.id)
 
       if (updateError) throw updateError
 
-      setProfileData(prev => ({
-        ...prev,
-        avatar: publicUrl
-      }))
+      setProfileData(prev => prev ? { ...prev, avatar_url: publicUrl } : null)
 
       toast({
         title: "Avatar Updated",
         description: "Your profile picture has been updated successfully.",
-        variant: "success",
+        variant: "default",
       })
     } catch (error: any) {
       console.error("Avatar upload error:", error)
@@ -170,24 +309,45 @@ export function Profile() {
   }
 
   const handleSaveChanges = async () => {
+    if (!user?.id || !profileData) return;
+    
     setLoading(true)
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('profiles')
         .update({
           name: profileData.name,
-          email: profileData.email,
           bio: profileData.bio,
-          location: profileData.location
+          city: profileData.city
         })
-        .eq('id', user?.id)
+        .eq('id', user.id)
 
       if (error) throw error
+
+      if (profileData.team_id && profileData.team_id !== userTeam?.id) {
+        if (userTeam?.id) {
+          await supabaseClient
+            .from('team_members')
+            .delete()
+            .eq('team_id', userTeam.id)
+            .eq('user_id', user.id);
+        }
+
+        await supabaseClient
+          .from('team_members')
+          .insert({
+            team_id: profileData.team_id,
+            user_id: user.id,
+            role: 'member'
+          });
+      }
+
+      await fetchUserData();
 
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
-        variant: "success",
+        variant: "default",
       })
     } catch (error: any) {
       console.error("Profile update error:", error)
@@ -202,23 +362,25 @@ export function Profile() {
   }
 
   const handleDownloadData = async () => {
+    if (!user?.id) return;
+    
     setDownloadingData(true)
     try {
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
         .select('*')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single()
 
-      const { data: challenges, error: challengesError } = await supabase
+      const { data: challenges, error: challengesError } = await supabaseClient
         .from('user_challenges')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
 
-      const { data: badges, error: badgesError } = await supabase
+      const { data: userBadges, error: badgesError } = await supabaseClient
         .from('user_badges')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
 
       if (profileError || challengesError || badgesError) {
         throw new Error(profileError?.message || challengesError?.message || badgesError?.message)
@@ -228,9 +390,7 @@ export function Profile() {
         profile,
         stats: userStats,
         challenges,
-        badges,
-        settings: {
-        },
+        badges: userBadges,
         downloadedAt: new Date().toISOString()
       }
 
@@ -241,7 +401,7 @@ export function Profile() {
 
       const link = document.createElement('a')
       link.href = url
-      link.download = `greengrid-data-${user?.id}-${new Date().toISOString().split('T')[0]}.json`
+      link.download = `greengrid-data-${user.id}-${new Date().toISOString().split('T')[0]}.json`
       document.body.appendChild(link)
       link.click()
 
@@ -251,7 +411,7 @@ export function Profile() {
       toast({
         title: "Data Downloaded",
         description: "Your user data has been downloaded successfully.",
-        variant: "success",
+        variant: "default",
       })
     } catch (error: any) {
       console.error('Data download error:', error)
@@ -281,7 +441,7 @@ export function Profile() {
     }
 
     try {
-      const { data: user, error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authUser, error: authError } = await supabaseClient.auth.signInWithPassword({
         email: userEmail,
         password: currentPassword,
       });
@@ -290,7 +450,7 @@ export function Profile() {
         throw authError;
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await supabaseClient.auth.updateUser({
         password: newPassword,
       });
 
@@ -377,13 +537,15 @@ export function Profile() {
   }
 
   const handleShare = async (type: 'impact' | 'badges', platform: string) => {
+    if (!userStats) return;
+    
     const ref = type === 'impact' ? impactSummaryRef : badgeCollectionRef
     const shareText = type === 'impact' 
-      ? `Check out my eco impact! 🌱\n${userStats.challengesCompleted} challenges\n${userStats.totalPoints} points\nRank #${userStats.rank}\n${badges.filter(b => b.earned).length} badges\n#GreenGrid`
+      ? `Check out my eco impact! 🌱\n${userStats.challenges_completed} challenges\n${userStats.total_points} points\nRank #${userStats.rank || 'N/A'}\n${userStats.badges_earned} badges\n#GreenGrid`
       : `My eco badges! 🏆\n${badges.filter(b => b.earned).map(b => `${b.name} (${b.rarity})`).join('\n')}\n#GreenGrid`
 
     if (platform === 'instagram') {
-      const imageUrl = await generateShareImage(ref)
+      const imageUrl = await generateShareImage(ref as React.RefObject<HTMLDivElement>)
       if (imageUrl) {
         await shareToInstagramStory(imageUrl)
       }
@@ -411,6 +573,33 @@ export function Profile() {
       description: "Share content is ready to paste",
       variant: "default",
     })
+  }
+
+  const getNextLevelProgress = () => {
+    if (!userStats) return 0;
+    const pointsForCurrentLevel = (userStats.level - 1) * 500;
+    const pointsForNextLevel = userStats.level * 500;
+    const progress = ((userStats.total_points - pointsForCurrentLevel) / (pointsForNextLevel - pointsForCurrentLevel)) * 100;
+    return Math.min(100, Math.max(0, progress));
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profileData || !userStats) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Profile not found</p>
+      </div>
+    );
   }
 
   return (
@@ -506,7 +695,7 @@ export function Profile() {
               <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profileData.avatar || "/placeholder.svg"} />
+                    <AvatarImage src={profileData.avatar_url || "/placeholder.svg"} />
                     <AvatarFallback className="text-xl">{profileData.name?.charAt(0) || "U"}</AvatarFallback>
                   </Avatar>
                   <input
@@ -526,14 +715,14 @@ export function Profile() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold">{profileData.name}</h3>
-                  <p className="text-gray-600">Eco Warrior since March 2024</p>
+                  <p className="text-gray-600">Eco Warrior since {new Date(profileData.created_at).toLocaleDateString()}</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <Badge className="bg-green-100 text-green-800">Level {userStats.level} - Climate Champion</Badge>
                     <div className="text-xs text-gray-500">
-                      {userStats.nextLevelProgress}% to Level {userStats.level + 1}
+                      {getNextLevelProgress().toFixed(0)}% to Level {userStats.level + 1}
                     </div>
                   </div>
-                  <Progress value={userStats.nextLevelProgress} className="h-1 w-32 mt-2" />
+                  <Progress value={getNextLevelProgress()} className="h-1 w-32 mt-2" />
                 </div>
               </div>
 
@@ -543,30 +732,33 @@ export function Profile() {
                     <label className="block text-sm font-medium mb-1">Full Name</label>
                     <Input
                       value={profileData.name}
-                      onChange={(e) => setProfileData((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => setProfileData(prev => prev ? { ...prev, name: e.target.value } : null)}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Email</label>
                     <Input
                       value={profileData.email}
-                      onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
+                      disabled
+                      className="bg-gray-50"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Location</label>
                     <Select
-                      value={profileData.location}
-                      onValueChange={(value) => setProfileData((prev) => ({ ...prev, location: value }))}
+                      value={profileData.city || ""}
+                      onValueChange={(value) => setProfileData(prev => prev ? { ...prev, city: value } : null)}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select your city" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="delhi">Delhi</SelectItem>
                         <SelectItem value="mumbai">Mumbai</SelectItem>
                         <SelectItem value="bangalore">Bangalore</SelectItem>
                         <SelectItem value="chennai">Chennai</SelectItem>
+                        <SelectItem value="pune">Pune</SelectItem>
+                        <SelectItem value="hyderabad">Hyderabad</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -575,14 +767,19 @@ export function Profile() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Team</label>
-                    <Select value="ecowarriors">
+                    <Select 
+                      value={profileData.team_id || ""}
+                      onValueChange={(value) => setProfileData(prev => prev ? { ...prev, team_id: value } : null)}
+                    >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select your team" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ecowarriors">EcoWarriors Delhi</SelectItem>
-                        <SelectItem value="greenguardians">Green Guardians Mumbai</SelectItem>
-                        <SelectItem value="bangalorebikers">Bangalore Bikers</SelectItem>
+                        {availableTeams.map((team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name} - {team.city}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -590,8 +787,8 @@ export function Profile() {
                     <label className="block text-sm font-medium mb-1">Bio</label>
                     <Textarea
                       placeholder="Tell us about your eco journey..."
-                      value={profileData.bio}
-                      onChange={(e) => setProfileData((prev) => ({ ...prev, bio: e.target.value }))}
+                      value={profileData.bio || ""}
+                      onChange={(e) => setProfileData(prev => prev ? { ...prev, bio: e.target.value } : null)}
                       rows={4}
                     />
                   </div>
@@ -602,7 +799,7 @@ export function Profile() {
                 <Button className="bg-green-600 hover:bg-green-700" onClick={handleSaveChanges} disabled={loading}>
                   {loading ? "Saving..." : "Save Changes"}
                 </Button>
-                <Button variant="outline">Cancel</Button>
+                <Button variant="outline" onClick={fetchUserData}>Refresh</Button>
               </div>
             </CardContent>
           </Card>
@@ -637,19 +834,19 @@ export function Profile() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-700">{userStats.challengesCompleted}</div>
+                  <div className="text-2xl font-bold text-green-700">{userStats.challenges_completed}</div>
                   <div className="text-sm text-green-600">Challenges Completed</div>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-700">{userStats.totalPoints}</div>
+                  <div className="text-2xl font-bold text-blue-700">{userStats.total_points}</div>
                   <div className="text-sm text-blue-600">Total EcoPoints</div>
                 </div>
                 <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-700">{userStats.rank}</div>
+                  <div className="text-2xl font-bold text-yellow-700">{userStats.rank || 'N/A'}</div>
                   <div className="text-sm text-yellow-600">Global Rank</div>
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-700">{badges.filter((b) => b.earned).length}</div>
+                  <div className="text-2xl font-bold text-purple-700">{userStats.badges_earned}</div>
                   <div className="text-sm text-purple-600">Badges Earned</div>
                 </div>
               </div>
@@ -694,7 +891,7 @@ export function Profile() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {badges.map((badge, index) => (
                   <div
-                    key={index}
+                    key={badge.id}
                     className={`relative text-center p-4 rounded-lg border-2 transition-all cursor-pointer ${
                       badge.earned
                         ? "border-yellow-300 bg-yellow-50 shadow-md hover:shadow-lg"
@@ -735,30 +932,35 @@ export function Profile() {
               <CardDescription>Your completed eco-challenges and their impact</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {completedChallenges.map((challenge, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold">{challenge.title}</h4>
-                        <p className="text-sm text-gray-600 mt-1">Impact: {challenge.impact}</p>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Badge variant="outline" className="text-green-600 border-green-300">
-                            +{challenge.points} pts
-                          </Badge>
-                          <Badge variant="outline" className="text-purple-600 border-purple-300">
-                            {challenge.badge}
-                          </Badge>
+              {completedChallenges.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No completed challenges yet. Start your eco journey!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {completedChallenges.map((challenge, index) => (
+                    <div key={challenge.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{challenge.title}</h4>
+                          <p className="text-sm text-gray-600 mt-1">Impact: {challenge.impact_description}</p>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Badge variant="outline" className="text-green-600 border-green-300">
+                              +{challenge.points} pts
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">
+                            {new Date(challenge.completed_at).toLocaleDateString()}
+                          </div>
+                          <CheckCircle className="h-5 w-5 text-green-600 ml-auto mt-1" />
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm text-gray-500">{challenge.date}</div>
-                        <CheckCircle className="h-5 w-5 text-green-600 ml-auto mt-1" />
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
