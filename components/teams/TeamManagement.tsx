@@ -28,11 +28,10 @@ import {
 import { useApp } from "@/app/providers"
 import { useRealtime } from "@/lib/realtime"
 import { useToast } from "@/hooks/use-toast"
-import { Users, Plus, Mail, Link, Crown, UserMinus, Settings, Share2, Copy, CheckCircle, QrCode, Upload } from "lucide-react"
+import { Users, Plus, Link, Crown, UserMinus, Settings, Share2, Copy, CheckCircle, QrCode, Upload } from "lucide-react"
 
 export function TeamManagement() {
   const [isCreating, setIsCreating] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
   const [showQrCode, setShowQrCode] = useState(false)
   const [teamName, setTeamName] = useState("")
   const [teamDescription, setTeamDescription] = useState("")
@@ -196,35 +195,65 @@ export function TeamManagement() {
     }
   };
 
-  const handleInviteByEmail = async () => {
-    if (!inviteEmail || !teamInfo || !isAdmin) return
-    // Insert invitation record
-    const { error } = await supabase.from('team_invitations').insert({
-      team_id: teamInfo.id,
-      email: inviteEmail,
-      invited_by: user.id,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    })
-    if (error) {
-      toast({ title: "Invite Error", description: error.message, variant: "destructive" })
-      return
-    }
-    toast({
-      title: "Invitation Pending!",
-      description: `Invitation created for ${inviteEmail}. (Email will be sent if backend is set up)`,
-      variant: "success",
-    })
-    setInviteEmail("")
-  }
-
-  const handleRemoveMember = (memberId: string) => {
+  const handleRemoveMember = async (memberId: string) => {
+    if (!teamInfo || !isAdmin || memberId === user?.id) return;
+    
     try {
+      // Remove from team_members
+      const { error: memberError } = await supabase
+        .from("team_members")
+        .delete()
+        .eq("team_id", teamInfo.id)
+        .eq("user_id", memberId);
+      
+      if (memberError) throw memberError;
+      
+      // Update user's team_id to null
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ team_id: null })
+        .eq("id", memberId);
+      
+      if (profileError) throw profileError;
+      
+      // Log activity
+      await supabase.from("user_activity").insert({
+        user_id: memberId,
+        activity_type: "team_leave",
+        description: `Removed from team ${teamInfo.name}`,
+        points_earned: 0,
+        related_id: teamInfo.id,
+        related_type: "team",
+      });
+      
+      // Refetch team info
+      const { data: updatedTeam } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("id", teamInfo.id)
+        .single();
+      
+      if (updatedTeam) {
+        const { data: members } = await supabase
+          .from("team_members")
+          .select("user_id, role, profiles(name, email, avatar_url, total_points)")
+          .eq("team_id", updatedTeam.id);
+        
+        updatedTeam.members = (members || []).map((m: any) => ({
+          id: m.user_id,
+          name: m.profiles?.name || "",
+          email: m.profiles?.email || "",
+          role: m.role,
+          avatar: m.profiles?.avatar_url || "/placeholder.svg",
+          points: m.profiles?.total_points || 0,
+        }));
+        setTeamInfo(updatedTeam);
+      }
 
       toast({
         title: "Member Removed",
         description: "The member has been removed from the team.",
-        variant: "success",
+        variant: "default",
       })
     } catch (error: any) {
       toast({
@@ -422,14 +451,45 @@ export function TeamManagement() {
     }
   };
 
-  const handleLeaveTeam = () => {
+  const handleLeaveTeam = async () => {
+    if (!teamInfo || !user) return;
+    
     if (confirm("Are you sure you want to leave this team?")) {
       try {
+        // Remove from team_members
+        const { error: memberError } = await supabase
+          .from("team_members")
+          .delete()
+          .eq("team_id", teamInfo.id)
+          .eq("user_id", user.id);
+        
+        if (memberError) throw memberError;
+        
+        // Update user's team_id to null
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ team_id: null })
+          .eq("id", user.id);
+        
+        if (profileError) throw profileError;
+        
+        // Log activity
+        await supabase.from("user_activity").insert({
+          user_id: user.id,
+          activity_type: "team_leave",
+          description: `Left team ${teamInfo.name}`,
+          points_earned: 0,
+          related_id: teamInfo.id,
+          related_type: "team",
+        });
+        
+        // Clear team info
+        setTeamInfo(null);
 
         toast({
           title: "Team Left",
           description: "You have left the team successfully.",
-          variant: "success",
+          variant: "default",
         })
       } catch (error: any) {
         toast({
@@ -567,25 +627,33 @@ export function TeamManagement() {
                     <Link className="w-4 h-4 mr-1" />
                     {teamInfo.city}
                   </Badge>
+                  <Button variant="outline" size="sm" onClick={handleLeaveTeam}>
+                    <UserMinus className="w-4 h-4 mr-1" />
+                    Leave Team
+                  </Button>
                 </div>
-                {/* Invite by Email, Link, QR (admin only) */}
+                {/* Invite by Link, QR (admin only) */}
                 {isAdmin && (
                   <div className="mt-6 space-y-4">
-                    <div className="flex space-x-4">
-                      <Input
-                        type="email"
-                        placeholder="Enter email address"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                      />
-                      <Button onClick={handleInviteByEmail}>
-                        <Mail className="w-4 h-4 mr-2" />
-                        Invite by Email
-                      </Button>
-                    </div>
                     <div className="flex items-center space-x-4">
-                      <Input type="text" value={inviteLink} readOnly className="w-64" />
-                      <Button variant="ghost" onClick={() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000) }}>
+                      <Input type="text" value={inviteLink} readOnly className="flex-grow" />
+                      <Button variant="ghost" onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(inviteLink);
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        } catch (error) {
+                          // Fallback for browsers that don't support clipboard API
+                          const textArea = document.createElement('textarea');
+                          textArea.value = inviteLink;
+                          document.body.appendChild(textArea);
+                          textArea.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(textArea);
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        }
+                      }}>
                         {linkCopied ? (<><CheckCircle className="w-4 h-4 mr-2" />Copied!</>) : (<><Copy className="w-4 h-4 mr-2" />Copy</>)}
                       </Button>
                       <Dialog>

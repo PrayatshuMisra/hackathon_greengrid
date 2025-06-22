@@ -109,3 +109,23 @@ CREATE POLICY "System can create notifications" ON notifications FOR INSERT WITH
 -- User activity policies
 CREATE POLICY "Users can view own activity" ON user_activity FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "System can create activity" ON user_activity FOR INSERT WITH CHECK (true);
+
+-- Team invitations policies
+CREATE POLICY "Users can view team invitations for their teams" ON team_invitations FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM team_members 
+    WHERE team_id = team_invitations.team_id 
+    AND user_id = auth.uid()
+  )
+);
+CREATE POLICY "Team admins can create invitations" ON team_invitations FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM team_members 
+    WHERE team_id = team_invitations.team_id 
+    AND user_id = auth.uid() 
+    AND role = 'admin'
+  )
+);
+CREATE POLICY "Users can update their own invitations" ON team_invitations FOR UPDATE USING (
+  email = (SELECT email FROM profiles WHERE id = auth.uid())
+);
