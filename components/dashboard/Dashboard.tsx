@@ -692,8 +692,8 @@ export function Dashboard() {
                     key={index}
                     className={`relative text-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
                       badge.earned
-                        ? "border-yellow-300 bg-yellow-50 shadow-md hover:shadow-lg"
-                        : "border-gray-200 bg-gray-50 opacity-50 hover:opacity-75"
+                        ? "border-yellow-600 bg-yellow-200 shadow-lg hover:shadow-xl"
+                        : "border-gray-400 bg-gray-200 opacity-70 hover:opacity-90"
                     }`}
                   >
                     <div className="text-2xl mb-1">{badge.badges?.icon}</div>
@@ -704,18 +704,18 @@ export function Dashboard() {
                       variant="outline"
                       className={`text-xs ${
                         badge.badges?.rarity === "Legendary"
-                          ? "border-purple-300 text-purple-600"
+                          ? "border-purple-700 text-purple-900"
                           : badge.badges?.rarity === "Epic"
-                          ? "border-orange-300 text-orange-600"
-                          : badge.badges?.rarity === "Rare"
-                          ? "border-blue-300 text-blue-600"
-                          : "border-gray-300 text-gray-600"
+                            ? "border-orange-700 text-orange-900"
+                            : badge.badges?.rarity === "Rare"
+                              ? "border-blue-700 text-blue-900"
+                              : "border-gray-700 text-gray-900"
                       }`}
                     >
                       {badge.badges?.rarity}
                     </Badge>
                     {badge.earned && (
-                      <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-green-600 bg-white rounded-full" />
+                      <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-green-700 bg-white rounded-full" />
                     )}
                   </div>
                 )) : <div className="col-span-3 text-center text-gray-400">No badges earned yet</div>}
