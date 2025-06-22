@@ -39,7 +39,6 @@ export function Challenges() {
   const [joinedChallengeIds, setJoinedChallengeIds] = useState<string[]>([])
   const [participantsMap, setParticipantsMap] = useState<{ [challengeId: string]: number }>({})
 
-  // Fetch challenges from Supabase on mount
   useEffect(() => {
     const fetchChallenges = async () => {
       const { data, error } = await supabase
@@ -52,7 +51,6 @@ export function Challenges() {
     fetchChallenges();
   }, [supabase]);
 
-  // Fetch joined challenges for the user
   useEffect(() => {
     const fetchJoined = async () => {
       if (!user?.id) return;
@@ -68,7 +66,6 @@ export function Challenges() {
     fetchJoined();
   }, [user?.id, supabase]);
 
-  // Fetch participants count for each challenge
   useEffect(() => {
     const fetchParticipants = async () => {
       if (!challenges.length) return;
@@ -89,13 +86,12 @@ export function Challenges() {
   }, [challenges, supabase])
 
   const filteredChallenges = challenges.filter((challenge) => {
-    // Use category name from joined challenge_categories
+
     const categoryName = challenge.challenge_categories?.name?.toLowerCase() || "";
     if (selectedCategory !== "all" && categoryName !== selectedCategory) return false;
-    // For status, you may want to check user_challenges for joined/completed status
-    // For now, filter by is_active and end_date
+ 
     if (selectedStatus === "active" && (!challenge.is_active || (challenge.end_date && new Date(challenge.end_date) < new Date()))) return false;
-    if (selectedStatus === "completed") return false; // You can implement completed logic if you track it
+    if (selectedStatus === "completed") return false;
     return true;
   })
 
@@ -118,9 +114,9 @@ export function Challenges() {
     setJoiningChallenge(true)
 
     try {
-      // Debug: log IDs before upsert
+  
       console.log('user.id:', user.id, 'selectedChallenge.id:', selectedChallenge.id);
-      // Insert or upsert into user_challenges
+ 
       const { data, error } = await supabase
         .from("user_challenges")
         .upsert([
@@ -131,12 +127,11 @@ export function Challenges() {
             progress: 0,
           }
         ], { onConflict: ['user_id', 'challenge_id'] });
-      // Debug: log full response
+  
       console.log('Upsert response:', { data, error });
 
       if (error) throw error;
 
-      // Insert activity into user_activity
       await supabase.from("user_activity").insert([
         {
           user_id: user.id,
@@ -150,7 +145,6 @@ export function Challenges() {
 
       setJoinDialogOpen(false)
 
-      // Add to joinedChallengeIds immediately
       setJoinedChallengeIds((prev) => [...prev, selectedChallenge.id])
 
       toast({
@@ -159,8 +153,6 @@ export function Challenges() {
         variant: "success",
       })
 
-      // Optionally: trigger a refresh of active challenges if you have a global fetchActiveChallenges
-      // If not, the Dashboard will pick it up on next mount
     } catch (error) {
       console.error("Error joining challenge:", error)
       toast({

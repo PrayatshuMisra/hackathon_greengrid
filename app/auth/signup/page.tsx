@@ -52,7 +52,6 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      // Basic validation
       if (!name.trim()) {
         throw new Error("Name is required");
       }

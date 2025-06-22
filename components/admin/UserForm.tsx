@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState } from "react"
-import { supabase } from "@/lib/supabase" // Updated import path
+import { supabase } from "@/lib/supabase"
 
 const userSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -22,9 +22,25 @@ const userSchema = z.object({
   avatar_url: z.string().optional(),
 })
 
-export function UserForm({ user, onSubmit }) {
+interface User {
+  id?: string;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  status: "active" | "suspended";
+  city?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+interface UserFormProps {
+  user?: User;
+  onSubmit: (data: any) => Promise<void>;
+}
+
+export function UserForm({ user, onSubmit }: UserFormProps) {
   const [loading, setLoading] = useState(false)
-  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar_url || "")
 
   const form = useForm({
@@ -40,35 +56,30 @@ export function UserForm({ user, onSubmit }) {
     },
   })
 
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0]
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0]
     if (file) {
       setAvatarFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
-        setAvatarPreview(reader.result)
+        setAvatarPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleFormSubmit = async (data) => {
+  const handleFormSubmit = async (data: any) => {
     try {
       setLoading(true)
-
-      if (avatarFile) {
+      if (avatarFile && avatarFile.name) {
         const fileName = `avatar-${Date.now()}-${avatarFile.name}`
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(fileName, avatarFile)
-
         if (uploadError) throw uploadError
-
         const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(fileName)
-
         data.avatar_url = publicUrlData.publicUrl
       }
-
       await onSubmit(data)
     } catch (error) {
       console.error("Error submitting form:", error)

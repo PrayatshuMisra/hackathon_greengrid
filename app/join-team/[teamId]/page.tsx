@@ -25,7 +25,6 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
   useEffect(() => {
     const fetchTeamInfo = async () => {
       try {
-        // Fetch team information
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
           .select('*')
@@ -38,7 +37,6 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
           return
         }
 
-        // Check if invite code matches
         if (inviteCode && teamData.invite_code !== inviteCode) {
           setInvitationValid(false)
           setLoading(false)
@@ -48,11 +46,9 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
         setTeam(teamData)
         setInvitationValid(true)
 
-        // Check if user is logged in
         if (user) {
           setUserExists(true)
-          
-          // Check if user is already in this team
+
           if (user.team_id === params.teamId) {
             toast({
               title: "Already in team",
@@ -89,14 +85,13 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
 
     setJoining(true)
     try {
-      // Add user to team_members
+
       const { error: memberError } = await supabase
         .from("team_members")
         .insert({ team_id: team.id, user_id: user.id, role: "member" })
 
       if (memberError) throw memberError
 
-      // Update user's team_id
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ team_id: team.id })
@@ -104,7 +99,6 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
 
       if (profileError) throw profileError
 
-      // Log activity
       await supabase.from("user_activity").insert({
         user_id: user.id,
         activity_type: "team_join",
@@ -120,7 +114,6 @@ export default function JoinTeamPage({ params }: { params: { teamId: string } })
         variant: "default",
       })
 
-      // Redirect to teams page
       window.location.href = '/teams'
     } catch (error: any) {
       console.error('Join team error:', error)

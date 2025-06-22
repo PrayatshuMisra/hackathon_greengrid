@@ -19,7 +19,6 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { TeamForm } from "@/components/admin/TeamForm"
 
-// Define the Team interface properly
 interface Team {
   id: string
   name: string
@@ -59,10 +58,8 @@ async function fetchTeams() {
 
     if (teamsError) throw teamsError
 
-    // Get team IDs
     const teamIds = teamsData.map((team) => team.id)
 
-    // Count members for each team (in parallel)
     const memberCountsPromises = teamIds.map((id) =>
       supabase
         .from("team_members")
@@ -73,13 +70,11 @@ async function fetchTeams() {
 
     const memberCountsArray = await Promise.all(memberCountsPromises)
 
-    // Create count map
     const countMap: Record<string, number> = {}
     memberCountsArray.forEach(({ team_id, count }) => {
       countMap[team_id] = count || 0
     })
 
-    // Merge counts into teams
     const processedTeams = teamsData.map((team) => ({
       ...team,
       member_count: countMap[team.id] || 0,
@@ -189,8 +184,7 @@ async function fetchTeams() {
   const handleTestTrigger = async () => {
     try {
       console.log("Testing trigger functionality...");
-      
-      // Get a sample team
+
       const { data: sampleTeam } = await supabase
         .from("teams")
         .select("id, member_count")
@@ -203,9 +197,8 @@ async function fetchTeams() {
       }
       
       console.log(`Testing with team ${sampleTeam.id}, current count: ${sampleTeam.member_count}`);
-      
-      // Test the trigger by inserting a temporary member (will be deleted)
-      const testUserId = "00000000-0000-0000-0000-000000000000"; // Dummy UUID
+
+      const testUserId = "00000000-0000-0000-0000-000000000000";
       
       const { error: insertError } = await supabase
         .from("team_members")
@@ -218,8 +211,7 @@ async function fetchTeams() {
       }
       
       console.log("Test member inserted, checking if count increased...");
-      
-      // Check if count increased
+
       const { data: afterInsert } = await supabase
         .from("teams")
         .select("member_count")
@@ -227,8 +219,7 @@ async function fetchTeams() {
         .single();
       
       console.log(`Count after insert: ${afterInsert?.member_count}`);
-      
-      // Delete the test member
+
       const { error: deleteError } = await supabase
         .from("team_members")
         .delete()
@@ -238,8 +229,7 @@ async function fetchTeams() {
       if (deleteError) {
         console.error("Delete test failed:", deleteError);
       }
-      
-      // Check if count decreased
+
       const { data: afterDelete } = await supabase
         .from("teams")
         .select("member_count")
@@ -257,7 +247,7 @@ async function fetchTeams() {
         toast({ title: "Trigger Test Failed", description: "Database trigger may not be working", variant: "destructive" });
       }
       
-      fetchTeams(); // Refresh the data
+      fetchTeams();
       
     } catch (error) {
       console.error("Test error:", error);

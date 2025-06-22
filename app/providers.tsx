@@ -48,7 +48,6 @@ const AppContext = createContext<AppContextType>({
 
 export const useApp = () => useContext(AppContext)
 
-// Helper function to get cookie value
 const getCookie = (name: string): string | null => {
   if (typeof document === 'undefined') return null;
   const value = `; ${document.cookie}`;
@@ -62,7 +61,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const signOut = async () => {
-    // Remove demo cookie if it exists
+
     if (typeof document !== 'undefined') {
       document.cookie = "demo=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
@@ -75,14 +74,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       setLoading(true)
       try {
         console.log("getUser function called");
-        
-        // Check for demo user first
+
         const isDemo = getCookie('demo') === 'true'
         console.log("Demo cookie check:", isDemo);
         
         if (isDemo) {
           console.log("Creating demo user object");
-          // Create demo user object
+
           const demoUser: User = {
             id: 'demo-user-id',
             name: 'Demo User',
@@ -145,7 +143,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               user_metadata: session.user.user_metadata || {},
             })
           } else {
-            // Profile doesn't exist, create one
+
             console.log("Profile doesn't exist, creating new profile");
             const userData = {
               id: session.user.id,
@@ -210,7 +208,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Real-time listener for profile updates (only for real users, not demo)
   useEffect(() => {
     if (!user?.id || user.isDemo) return;
 

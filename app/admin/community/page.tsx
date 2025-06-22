@@ -21,23 +21,68 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+interface User {
+  id: string;
+  name: string;
+  avatar_url?: string;
+}
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  author?: User;
+  likes_count?: number;
+  comments_count?: number;
+  created_at: string;
+}
+
+interface Comment {
+  id: string;
+  content: string;
+  author_id: string;
+  author?: User;
+  post_id: string;
+  post?: { id: string; title: string };
+  created_at: string;
+}
+
+interface Report {
+  id: string;
+  reason: string;
+  content_type: string;
+  reporter?: User;
+  reported_by?: string;
+  user_id?: string;
+  status: string;
+  details?: string;
+  created_at: string;
+}
+
+interface Errors {
+  posts: string | null;
+  comments: string | null;
+  reports: string | null;
+}
+
 export default function CommunityAdmin() {
-  const [posts, setPosts] = useState([])
-  const [comments, setComments] = useState([])
-  const [reports, setReports] = useState([])
+  const [posts, setPosts] = useState<Post[]>([])
+  const [comments, setComments] = useState<Comment[]>([])
+  const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState("created_at")
-  const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedPost, setSelectedPost] = useState(null)
-  const [selectedComment, setSelectedComment] = useState(null)
-  const [selectedReport, setSelectedReport] = useState(null)
+  const [sortField, setSortField] = useState<string>("created_at")
+  const [sortDirection, setSortDirection] = useState<"asc"|"desc">("desc")
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+  const [selectedComment, setSelectedComment] = useState<Comment | null>(null)
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [isViewPostDialogOpen, setIsViewPostDialogOpen] = useState(false)
   const [isDeletePostDialogOpen, setIsDeletePostDialogOpen] = useState(false)
   const [isViewCommentDialogOpen, setIsViewCommentDialogOpen] = useState(false)
   const [isDeleteCommentDialogOpen, setIsDeleteCommentDialogOpen] = useState(false)
   const [isViewReportDialogOpen, setIsViewReportDialogOpen] = useState(false)
-  const [errors, setErrors] = useState({
+  const [errors, setErrors] = useState<Errors>({
     posts: null,
     comments: null,
     reports: null,
@@ -53,9 +98,8 @@ export default function CommunityAdmin() {
       setLoading(true)
       setErrors({ posts: null, comments: null, reports: null })
 
-      // Try to fetch posts from different possible table names
-      let postsData = []
-      let postsError = null
+      let postsData: Post[] = []
+      let postsError: string | null = null
 
       try {
         const { data, error } = await supabase
@@ -64,15 +108,14 @@ export default function CommunityAdmin() {
           .order(sortField, { ascending: sortDirection === "asc" })
 
         if (error) throw error
-        postsData = data || []
+        postsData = (data as Post[]) || []
       } catch (error) {
         console.log("forum_posts table not found, trying alternative...")
         postsError = "Forum posts table not available"
       }
 
-      // Try to fetch comments from different possible table names
-      let commentsData = []
-      let commentsError = null
+      let commentsData: Comment[] = []
+      let commentsError: string | null = null
 
       try {
         const { data, error } = await supabase
@@ -81,15 +124,14 @@ export default function CommunityAdmin() {
           .order(sortField, { ascending: sortDirection === "asc" })
 
         if (error) throw error
-        commentsData = data || []
+        commentsData = (data as Comment[]) || []
       } catch (error) {
         console.log("forum_replies table not found, trying alternative...")
         commentsError = "Forum replies table not available"
       }
 
-      // Try to fetch reports - handle the case where table doesn't exist
-      let reportsData = []
-      let reportsError = null
+      let reportsData: Report[] = []
+      let reportsError: string | null = null
 
       try {
         const { data, error } = await supabase
@@ -98,21 +140,19 @@ export default function CommunityAdmin() {
           .order(sortField, { ascending: sortDirection === "asc" })
 
         if (error) throw error
-        reportsData = data || []
+        reportsData = (data as Report[]) || []
       } catch (error) {
         console.log("content_reports table not found")
         reportsError = "Content reports table not available"
       }
 
-      // Set errors for missing tables
       setErrors({
         posts: postsError,
         comments: commentsError,
         reports: reportsError,
       })
 
-      // If we have data, fetch user information
-      let usersData = []
+      let usersData: User[] = []
       if (postsData.length > 0 || commentsData.length > 0 || reportsData.length > 0) {
         const postAuthorIds = [...new Set(postsData?.map((post) => post.author_id).filter(Boolean) || [])]
         const commentAuthorIds = [...new Set(commentsData?.map((comment) => comment.author_id).filter(Boolean) || [])]
@@ -130,7 +170,7 @@ export default function CommunityAdmin() {
               .in("id", allUserIds)
 
             if (!usersError) {
-              usersData = users || []
+              usersData = (users as User[]) || []
             }
           } catch (error) {
             console.log("Error fetching user profiles:", error)
@@ -138,8 +178,7 @@ export default function CommunityAdmin() {
         }
       }
 
-      // Fetch post titles for comments if we have comments
-      let postsForComments = []
+      let postsForComments: { id: string; title: string }[] = []
       if (commentsData.length > 0) {
         const postIds = [...new Set(commentsData?.map((comment) => comment.post_id).filter(Boolean) || [])]
         if (postIds.length > 0) {
@@ -150,7 +189,7 @@ export default function CommunityAdmin() {
               .in("id", postIds)
 
             if (!postsError) {
-              postsForComments = posts || []
+              postsForComments = (posts as { id: string; title: string }[]) || []
             }
           } catch (error) {
             console.log("Error fetching post titles:", error)
@@ -158,22 +197,21 @@ export default function CommunityAdmin() {
         }
       }
 
-      // Combine data with user information
-      const postsWithAuthors =
-        postsData?.map((post) => ({
+      const postsWithAuthors: Post[] =
+        postsData?.map((post: Post) => ({
           ...post,
           author: usersData.find((user) => user.id === post.author_id),
         })) || []
 
-      const commentsWithAuthors =
-        commentsData?.map((comment) => ({
+      const commentsWithAuthors: Comment[] =
+        commentsData?.map((comment: Comment) => ({
           ...comment,
           author: usersData.find((user) => user.id === comment.author_id),
           post: postsForComments.find((post) => post.id === comment.post_id),
         })) || []
 
-      const reportsWithReporters =
-        reportsData?.map((report) => ({
+      const reportsWithReporters: Report[] =
+        reportsData?.map((report: Report) => ({
           ...report,
           reporter: usersData.find((user) => user.id === (report.reported_by || report.user_id)),
         })) || []
@@ -181,11 +219,11 @@ export default function CommunityAdmin() {
       setPosts(postsWithAuthors)
       setComments(commentsWithAuthors)
       setReports(reportsWithReporters)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching community data:", error)
       toast({
         title: "Error fetching community data",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     } finally {
@@ -193,7 +231,7 @@ export default function CommunityAdmin() {
     }
   }
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -203,72 +241,66 @@ export default function CommunityAdmin() {
   }
 
   const handleDeletePost = async () => {
+    if (!selectedPost) return
     try {
       const { error } = await supabase.from("forum_posts").delete().eq("id", selectedPost.id)
-
       if (error) throw error
-
       toast({
         title: "Post deleted",
         description: "The post has been deleted successfully",
       })
-
       setIsDeletePostDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting post:", error)
       toast({
         title: "Error deleting post",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const handleDeleteComment = async () => {
+    if (!selectedComment) return
     try {
       const { error } = await supabase.from("forum_replies").delete().eq("id", selectedComment.id)
-
       if (error) throw error
-
       toast({
         title: "Comment deleted",
         description: "The comment has been deleted successfully",
       })
-
       setIsDeleteCommentDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting comment:", error)
       toast({
         title: "Error deleting comment",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const handleResolveReport = async () => {
+    if (!selectedReport) return
     try {
       const { error } = await supabase
         .from("content_reports")
         .update({ status: "resolved" })
         .eq("id", selectedReport.id)
-
       if (error) throw error
-
       toast({
         title: "Report resolved",
         description: "The report has been marked as resolved",
       })
-
       setIsViewReportDialogOpen(false)
       fetchCommunityData()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error resolving report:", error)
       toast({
         title: "Error resolving report",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }

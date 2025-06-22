@@ -20,16 +20,32 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { UserForm } from "@/components/admin/UserForm"
 
+interface User {
+  id: string
+  name: string
+  email: string
+  role: "user" | "admin"
+  status: "active" | "suspended"
+  avatar_url?: string
+  created_at: string
+  city?: string
+  points?: number
+  last_active?: string
+  bio?: string
+}
+
 export default function UsersAdmin() {
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState("created_at")
-  const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedUser, setSelectedUser] = useState(null)
+  const [sortField, setSortField] = useState<string>("created_at")
+  const [sortDirection, setSortDirection] = useState<string>("desc")
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
+  const [confirmStatusUser, setConfirmStatusUser] = useState<User | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -39,22 +55,20 @@ export default function UsersAdmin() {
   async function fetchUsers() {
     try {
       setLoading(true)
-
       const query = supabase
         .from("profiles")
         .select("*")
         .order(sortField, { ascending: sortDirection === "asc" })
-
       const { data, error } = await query
-
       if (error) throw error
-
-      setUsers(data || [])
+      setUsers((data as User[]) || [])
     } catch (error) {
       console.error("Error fetching users:", error)
       toast({
         title: "Error fetching users",
-        description: error.message,
+        description: (error && typeof error === 'object' && 'message' in error)
+          ? (error as any).message
+          : String(error || 'Unknown error'),
         variant: "destructive",
       })
     } finally {
@@ -62,7 +76,7 @@ export default function UsersAdmin() {
     }
   }
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -71,78 +85,96 @@ export default function UsersAdmin() {
     }
   }
 
-  const handleUpdateUser = async (formData) => {
+  const handleUpdateUser = async (formData: Partial<User>) => {
+    if (!selectedUser) return
+    setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_edit']: true }))
     try {
-      const { data, error } = await supabase.from("profiles").update(formData).eq("id", selectedUser.id).select()
-
-      if (error) throw error
-
+      const res = await fetch("/api/admin/update-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: selectedUser.id, update: formData })
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Unknown error")
       toast({
         title: "User updated",
         description: "The user has been updated successfully",
       })
-
       setIsEditDialogOpen(false)
       fetchUsers()
     } catch (error) {
       console.error("Error updating user:", error)
       toast({
         title: "Error updating user",
-        description: error.message,
+        description: (error && typeof error === 'object' && 'message' in error)
+          ? (error as any).message
+          : String(error || 'Unknown error'),
         variant: "destructive",
       })
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_edit']: false }))
     }
   }
 
   const handleDeleteUser = async () => {
+    if (!selectedUser) return
+    setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_delete']: true }))
     try {
       const { error } = await supabase.from("profiles").delete().eq("id", selectedUser.id)
-
       if (error) throw error
-
       toast({
         title: "User deleted",
         description: "The user has been deleted successfully",
       })
-
       setIsDeleteDialogOpen(false)
       fetchUsers()
     } catch (error) {
       console.error("Error deleting user:", error)
       toast({
         title: "Error deleting user",
-        description: error.message,
+        description: (error && typeof error === 'object' && 'message' in error)
+          ? (error as any).message
+          : String(error || 'Unknown error'),
         variant: "destructive",
       })
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_delete']: false }))
     }
   }
 
-  const handleToggleUserStatus = async (user) => {
+  const handleToggleUserStatus = async (user: User) => {
+    setActionLoading((prev) => ({ ...prev, [user.id + '_status']: true }))
     try {
       const newStatus = user.status === "active" ? "suspended" : "active"
-
-      const { data, error } = await supabase.from("profiles").update({ status: newStatus }).eq("id", user.id).select()
-
-      if (error) throw error
-
+      const res = await fetch("/api/admin/update-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, update: { status: newStatus } })
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Unknown error")
       toast({
         title: `User ${newStatus === "active" ? "activated" : "suspended"}`,
         description: `${user.name} has been ${newStatus === "active" ? "activated" : "suspended"} successfully`,
       })
-
+      setConfirmStatusUser(null)
       fetchUsers()
     } catch (error) {
       console.error("Error updating user status:", error)
       toast({
         title: "Error updating user status",
-        description: error.message,
+        description: (error && typeof error === 'object' && 'message' in error)
+          ? (error as any).message
+          : String(error || 'Unknown error'),
         variant: "destructive",
       })
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [user.id + '_status']: false }))
     }
   }
 
   const filteredUsers = users.filter(
-    (user) =>
+    (user: User) =>
       user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
@@ -260,7 +292,7 @@ export default function UsersAdmin() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" disabled={actionLoading[user.id + '_edit'] || actionLoading[user.id + '_delete'] || actionLoading[user.id + '_status']}>
                           <span className="sr-only">Open menu</span>
                           <svg
                             width="15"
@@ -285,6 +317,7 @@ export default function UsersAdmin() {
                             setSelectedUser(user)
                             setIsViewDialogOpen(true)
                           }}
+                          disabled={actionLoading[user.id + '_edit'] || actionLoading[user.id + '_delete'] || actionLoading[user.id + '_status']}
                         >
                           <Eye className="mr-2 h-4 w-4" />
                           View
@@ -294,11 +327,15 @@ export default function UsersAdmin() {
                             setSelectedUser(user)
                             setIsEditDialogOpen(true)
                           }}
+                          disabled={actionLoading[user.id + '_edit'] || actionLoading[user.id + '_delete'] || actionLoading[user.id + '_status']}
                         >
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleUserStatus(user)}>
+                        <DropdownMenuItem
+                          onClick={() => setConfirmStatusUser(user)}
+                          disabled={actionLoading[user.id + '_edit'] || actionLoading[user.id + '_delete'] || actionLoading[user.id + '_status']}
+                        >
                           {user.status === "active" ? (
                             <>
                               <UserX className="mr-2 h-4 w-4" />
@@ -317,6 +354,7 @@ export default function UsersAdmin() {
                             setIsDeleteDialogOpen(true)
                           }}
                           className="text-red-600"
+                          disabled={actionLoading[user.id + '_edit'] || actionLoading[user.id + '_delete'] || actionLoading[user.id + '_status']}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
@@ -436,6 +474,33 @@ export default function UsersAdmin() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteUser}>
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Suspend/Activate Dialog */}
+      <Dialog open={!!confirmStatusUser} onOpenChange={() => setConfirmStatusUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmStatusUser?.status === "active" ? "Suspend User" : "Activate User"}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to {confirmStatusUser?.status === "active" ? "suspend" : "activate"} this user?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmStatusUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={confirmStatusUser?.status === "active" ? "destructive" : "default"}
+              onClick={() => confirmStatusUser && handleToggleUserStatus(confirmStatusUser)}
+              disabled={!confirmStatusUser || actionLoading[confirmStatusUser.id + '_status']}
+            >
+              {confirmStatusUser && actionLoading[confirmStatusUser.id + '_status'] ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              {confirmStatusUser?.status === "active" ? "Suspend" : "Activate"}
             </Button>
           </DialogFooter>
         </DialogContent>

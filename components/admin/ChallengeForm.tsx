@@ -19,14 +19,27 @@ const challengeSchema = z.object({
   points: z.coerce.number().int().min(1, "Points must be at least 1"),
   duration_days: z.coerce.number().int().min(1, "Duration must be at least 1 day"),
   category_id: z.string().min(1, "Please select a category"),
+  challenge_type: z.string().min(1, "Please select a challenge type"),
   image_url: z.string().optional(),
   is_active: z.boolean().default(true),
 })
 
-export function ChallengeForm({ challenge = null, onSubmit }) {
-  const [categories, setCategories] = useState([])
+interface ChallengeFormProps {
+  challenge?: any;
+  onSubmit: (data: any) => void;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+}
+
+export function ChallengeForm({ challenge = null, onSubmit }: ChallengeFormProps) {
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
-  const [imageFile, setImageFile] = useState(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState(challenge?.image_url || "")
 
   const form = useForm({
@@ -37,6 +50,7 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
       points: challenge?.points || 10,
       duration_days: challenge?.duration_days || 7,
       category_id: challenge?.category_id?.toString() || "",
+      challenge_type: challenge?.challenge_type || "",
       image_url: challenge?.image_url || "",
       is_active: challenge?.is_active !== false, // Default to true if not specified
     },
@@ -46,47 +60,39 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
     async function fetchCategories() {
       try {
         const { data, error } = await supabase.from("challenge_categories").select("*").order("name")
-
         if (error) throw error
-
-        setCategories(data || [])
+        setCategories((data as Category[]) || [])
       } catch (error) {
         console.error("Error fetching categories:", error)
       }
     }
-
     fetchCategories()
   }, [])
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0]
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0]
     if (file) {
       setImageFile(file)
       const reader = new FileReader()
       reader.onloadend = () => {
-        setImagePreview(reader.result)
+        setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleFormSubmit = async (data) => {
+  const handleFormSubmit = async (data: any) => {
     try {
       setLoading(true)
-
       if (imageFile) {
         const fileName = `challenge-${Date.now()}-${imageFile.name}`
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("challenge-images")
           .upload(fileName, imageFile)
-
         if (uploadError) throw uploadError
-
         const { data: publicUrlData } = supabase.storage.from("challenge-images").getPublicUrl(fileName)
-
         data.image_url = publicUrlData.publicUrl
       }
-
       await onSubmit(data)
     } catch (error) {
       console.error("Error submitting form:", error)
@@ -225,6 +231,33 @@ export function ChallengeForm({ challenge = null, onSubmit }) {
               <FormControl>
                 <Switch checked={field.value} onCheckedChange={field.onChange} />
               </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="challenge_type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Challenge Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="plastic-free">Plastic-Free</SelectItem>
+                  <SelectItem value="bike-commute">Bike Commute</SelectItem>
+                  <SelectItem value="energy-bill">Energy Bill</SelectItem>
+                  <SelectItem value="composting">Composting</SelectItem>
+                  <SelectItem value="plant-growing">Plant Growing</SelectItem>
+                  <SelectItem value="water-bill">Water Bill</SelectItem>
+                  {/* Add more as needed */}
+                </SelectContent>
+              </Select>
+              <FormMessage />
             </FormItem>
           )}
         />

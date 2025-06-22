@@ -1,6 +1,6 @@
 import "./globals.css"
 import { Inter } from "next/font/google"
-import { Providers } from "./providers" // ✅ this wraps ThemeProvider
+import { Providers } from "./providers"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";

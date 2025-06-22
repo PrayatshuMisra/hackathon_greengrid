@@ -20,13 +20,39 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { AIVerification } from "@/components/ai/AIVerification"
 
+interface User {
+  id: string;
+  name: string;
+  avatar_url?: string;
+}
+
+interface Challenge {
+  id: string;
+  title: string;
+  description?: string;
+  challenge_type?: string;
+}
+
+interface Submission {
+  id: string;
+  user_id: string;
+  challenge_id: string;
+  status: string;
+  submitted_at: string;
+  file_url?: string;
+  description?: string;
+  user?: User;
+  challenge?: Challenge;
+  [key: string]: any;
+}
+
 export default function VerificationsAdmin() {
-  const [submissions, setSubmissions] = useState([])
+  const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState("created_at")
-  const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedSubmission, setSelectedSubmission] = useState(null)
+  const [sortField, setSortField] = useState<string>("created_at")
+  const [sortDirection, setSortDirection] = useState<"asc"|"desc">("desc")
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const { toast } = useToast()
@@ -38,25 +64,22 @@ export default function VerificationsAdmin() {
   async function fetchSubmissions() {
     try {
       setLoading(true)
-
-      // Updated query to use the correct table names and relationships
       const { data, error } = await supabase
         .from("challenge_submissions")
         .select(`
           *,
           user:user_id(id, name, avatar_url),
-          challenge:challenge_id(id, title, description)
+          challenge:challenge_id(id, title, description, challenge_type)
         `)
         .order(sortField === "created_at" ? "submitted_at" : sortField, { ascending: sortDirection === "asc" })
 
       if (error) throw error
-
-      setSubmissions(data || [])
-    } catch (error) {
+      setSubmissions((data as Submission[]) || [])
+    } catch (error: unknown) {
       console.error("Error fetching submissions:", error)
       toast({
         title: "Error fetching submissions",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     } finally {
@@ -64,7 +87,7 @@ export default function VerificationsAdmin() {
     }
   }
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     const mappedField = field === "created_at" ? "submitted_at" : field
     if (sortField === mappedField) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -75,82 +98,76 @@ export default function VerificationsAdmin() {
   }
 
   const handleApproveSubmission = async () => {
+    if (!selectedSubmission) return
     try {
       const { error } = await supabase
         .from("challenge_submissions")
         .update({ status: "approved" })
         .eq("id", selectedSubmission.id)
-
       if (error) throw error
-
       toast({
         title: "Submission approved",
         description: "The submission has been approved successfully",
       })
-
       setIsViewDialogOpen(false)
       fetchSubmissions()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error approving submission:", error)
       toast({
         title: "Error approving submission",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const handleRejectSubmission = async () => {
+    if (!selectedSubmission) return
     try {
       const { error } = await supabase
         .from("challenge_submissions")
         .update({ status: "rejected" })
         .eq("id", selectedSubmission.id)
-
       if (error) throw error
-
       toast({
         title: "Submission rejected",
         description: "The submission has been rejected",
       })
-
       setIsViewDialogOpen(false)
       fetchSubmissions()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error rejecting submission:", error)
       toast({
         title: "Error rejecting submission",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const handleDeleteSubmission = async () => {
+    if (!selectedSubmission) return
     try {
       const { error } = await supabase.from("challenge_submissions").delete().eq("id", selectedSubmission.id)
-
       if (error) throw error
-
       toast({
         title: "Submission deleted",
         description: "The submission has been deleted successfully",
       })
-
       setIsDeleteDialogOpen(false)
       fetchSubmissions()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting submission:", error)
       toast({
         title: "Error deleting submission",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const filteredSubmissions = submissions.filter(
-    (submission) =>
+    (submission: Submission) =>
       submission.challenge?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       submission.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
@@ -406,7 +423,10 @@ export default function VerificationsAdmin() {
               {selectedSubmission.status === "pending" && (
                 <div className="border-t pt-4">
                   <p className="font-medium mb-2">AI Verification</p>
-                  <AIVerification submission={selectedSubmission} />
+                  <AIVerification 
+                    challengeType={selectedSubmission.challenge?.challenge_type || ""}
+                    onVerificationComplete={() => {}}
+                  />
                 </div>
               )}
             </div>

@@ -20,13 +20,31 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { ChallengeForm } from "@/components/admin/ChallengeForm"
 
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  points: number;
+  duration_days: number;
+  is_active: boolean;
+  created_at: string;
+  image_url?: string;
+  challenge_category?: {
+    id: string;
+    name: string;
+    icon?: string;
+    color?: string;
+  };
+  [key: string]: any;
+}
+
 export default function ChallengesAdmin() {
-  const [challenges, setChallenges] = useState([])
+  const [challenges, setChallenges] = useState<Challenge[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState("created_at")
-  const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedChallenge, setSelectedChallenge] = useState(null)
+  const [sortField, setSortField] = useState<string>("created_at")
+  const [sortDirection, setSortDirection] = useState<"asc"|"desc">("desc")
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -40,25 +58,18 @@ export default function ChallengesAdmin() {
   async function fetchChallenges() {
     try {
       setLoading(true)
-
       const query = supabase
         .from("challenges")
-        .select(`
-          *,
-          challenge_category:category_id(id, name, icon, color)
-        `)
+        .select(`*, challenge_category:category_id(id, name, icon, color)`)
         .order(sortField, { ascending: sortDirection === "asc" })
-
       const { data, error } = await query
-
       if (error) throw error
-
-      setChallenges(data || [])
-    } catch (error) {
+      setChallenges((data as Challenge[]) || [])
+    } catch (error: unknown) {
       console.error("Error fetching challenges:", error)
       toast({
         title: "Error fetching challenges",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     } finally {
@@ -66,7 +77,7 @@ export default function ChallengesAdmin() {
     }
   }
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
@@ -75,70 +86,73 @@ export default function ChallengesAdmin() {
     }
   }
 
-  const handleCreateChallenge = async (formData) => {
+  const handleCreateChallenge = async (formData: Partial<Challenge>) => {
     try {
-      const { data, error } = await supabase.from("challenges").insert([formData]).select()
-
-      if (error) throw error
-
+      const res = await fetch("/api/admin/update-challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", data: formData })
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Unknown error")
       toast({
         title: "Challenge created",
         description: "The challenge has been created successfully",
       })
-
       setIsCreateDialogOpen(false)
       fetchChallenges()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error creating challenge:", error)
       toast({
         title: "Error creating challenge",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
-  const handleUpdateChallenge = async (formData) => {
+  const handleUpdateChallenge = async (formData: Partial<Challenge>) => {
+    if (!selectedChallenge) return
     try {
-      const { data, error } = await supabase.from("challenges").update(formData).eq("id", selectedChallenge.id).select()
-
-      if (error) throw error
-
+      const res = await fetch("/api/admin/update-challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update", id: selectedChallenge.id, data: formData })
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Unknown error")
       toast({
         title: "Challenge updated",
         description: "The challenge has been updated successfully",
       })
-
       setIsEditDialogOpen(false)
       fetchChallenges()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating challenge:", error)
       toast({
         title: "Error updating challenge",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
   }
 
   const handleDeleteChallenge = async () => {
+    if (!selectedChallenge) return
     try {
       const { error } = await supabase.from("challenges").delete().eq("id", selectedChallenge.id)
-
       if (error) throw error
-
       toast({
         title: "Challenge deleted",
         description: "The challenge has been deleted successfully",
       })
-
       setIsDeleteDialogOpen(false)
       fetchChallenges()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error deleting challenge:", error)
       toast({
         title: "Error deleting challenge",
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       })
     }
@@ -396,7 +410,7 @@ export default function ChallengesAdmin() {
             <DialogTitle>Edit Challenge</DialogTitle>
             <DialogDescription>Update the challenge details</DialogDescription>
           </DialogHeader>
-          {selectedChallenge && <ChallengeForm challenge={selectedChallenge} onSubmit={handleUpdateChallenge} />}
+          <ChallengeForm challenge={selectedChallenge ?? undefined} onSubmit={handleUpdateChallenge} />
         </DialogContent>
       </Dialog>
 
