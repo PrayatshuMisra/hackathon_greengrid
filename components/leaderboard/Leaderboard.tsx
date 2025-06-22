@@ -58,7 +58,8 @@ export function Leaderboard() {
           .select("*")
           .order("rank", { ascending: true, nullsFirst: false });
         if (individualsError) throw individualsError;
-        setIndividualsData(individuals || []);
+        // Sort by total_points descending for individuals
+        setIndividualsData((individuals || []).sort((a: { total_points: number }, b: { total_points: number }) => (b.total_points || 0) - (a.total_points || 0)));
 
       } catch (error) {
         console.error("Error fetching leaderboard data:", error);
