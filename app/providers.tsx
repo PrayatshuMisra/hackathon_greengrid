@@ -70,7 +70,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    const fetchOrCreateProfile = async (sessionUser: any, retries = 3) => {
+    const fetchOrCreateProfile = async (sessionUser: any, retries = 5) => {
       let profile, profileError;
       for (let attempt = 0; attempt < retries; attempt++) {
         const { data, error } = await supabase
@@ -100,6 +100,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         }
         // Wait before retrying
         await new Promise((res) => setTimeout(res, 1200));
+      }
+      // Final fetch to ensure profile exists
+      if (!profile) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", sessionUser.id)
+          .single();
+        profile = data;
       }
       return profile;
     };
