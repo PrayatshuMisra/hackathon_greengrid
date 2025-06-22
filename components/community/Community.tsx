@@ -383,17 +383,17 @@ export function Community() {
         )
       );
 
-      if (post && post.author_id !== user.id) {
+      if (post && post.author_id && post.author_id !== user.id) {
         await supabase.from("notifications").insert({
           user_id: post.author_id,
-          title: "New Comment on Your Post",
-          message: `${user.user_metadata?.name || "A user"} commented on your post "${post.title}"`,
+          title: "New Reply on Your Post",
+          message: `${user.user_metadata?.name || "A user"} replied to your post '${post.title}'`,
           type: "badge",
           is_read: false,
           data: {
             post_id: postId,
-            action: "comment",
-            commenter_name: user.user_metadata?.name || "A user",
+            action: "reply",
+            replier_name: user.user_metadata?.name || "A user",
             comment_content: commentContent.substring(0, 50) + (commentContent.length > 50 ? "..." : "")
           },
         });
@@ -587,11 +587,12 @@ export function Community() {
           .update({ like_count: (comment?.like_count || 0) + 1 })
           .eq("id", commentId);
 
-        if (comment && comment.author_id !== user.id) {
+        if (comment && comment.author_id && comment.author_id !== user.id) {
+          const parentPost = forumPosts.find(p => p.id === comment.post_id);
           await supabase.from("notifications").insert({
             user_id: comment.author_id,
             title: "New Like on Your Comment",
-            message: `${user.user_metadata?.name || "A user"} liked your comment`,
+            message: `${user.user_metadata?.name || "A user"} liked your comment on '${parentPost?.title || 'a post'}'`,
             type: "badge",
             is_read: false,
             data: {
@@ -700,11 +701,11 @@ export function Community() {
           .update({ like_count: (post?.like_count || 0) + 1 })
           .eq("id", postId);
 
-        if (authorId !== user.id) {
+        if (authorId && authorId !== user.id) {
           await supabase.from("notifications").insert({
             user_id: authorId,
             title: "New Like on Your Post",
-            message: `${user.user_metadata?.name || "A user"} liked your post "${post?.title || 'your post'}"`,
+            message: `${user.user_metadata?.name || "A user"} liked your post '${post?.title || 'your post'}'`,
             type: "badge",
             is_read: false,
             data: {
