@@ -19,23 +19,29 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { TeamForm } from "@/components/admin/TeamForm"
 
-export default function TeamsAdmin() {
-  type Team = {
+// Define the Team interface properly
+interface Team {
   id: string
   name: string
-  // add other fields like description, etc., if needed
+  city?: string
+  description?: string
+  points?: number
   member_count: number
+  created_at: string
+  invite_code?: string
 }
 
+export default function TeamsAdmin() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState("created_at")
   const [sortDirection, setSortDirection] = useState("desc")
-  const [selectedTeam, setSelectedTeam] = useState(null)
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [syncingCounts, setSyncingCounts] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -81,22 +87,16 @@ async function fetchTeams() {
 
     setTeams(processedTeams || [])
   } catch (error) {
-    if (error instanceof Error) {
-    console.error(error.message)
-  } else {
-    console.error("Unknown error", error)
-  }
     console.error("Error fetching teams:", error)
     toast({
       title: "Error fetching teams",
-      description: error.message,
+      description: error instanceof Error ? error.message : "An unknown error occurred",
       variant: "destructive",
     })
   } finally {
     setLoading(false)
   }
 }
-
 
   type SortableField = "name" | "points" | "created_at"
   const handleSort = (field: SortableField) => {
@@ -108,9 +108,21 @@ async function fetchTeams() {
     }
   }
 
-  const handleUpdateTeam = async (formData) => {
+  const handleUpdateTeam = async (formData: Record<string, any>) => {
+    if (!selectedTeam || !selectedTeam.id) {
+      toast({
+        title: "No team selected",
+        description: "Please select a team to update.",
+        variant: "destructive",
+      })
+      return
+    }
     try {
-      const { data, error } = await supabase.from("teams").update(formData).eq("id", selectedTeam.id).select()
+      const { data, error } = await supabase
+        .from("teams")
+        .update(formData)
+        .eq("id", selectedTeam.id)
+        .select()
 
       if (error) throw error
 
@@ -122,40 +134,134 @@ async function fetchTeams() {
       setIsEditDialogOpen(false)
       fetchTeams()
     } catch (error) {
-      if (error instanceof Error) {
-    console.error(error.message)
-  } else {
-    console.error("Unknown error", error)
-  }
       console.error("Error updating team:", error)
       toast({
         title: "Error updating team",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       })
     }
   }
 
   const handleDeleteTeam = async () => {
+    if (!selectedTeam) return
     try {
-      const { error } = await supabase.from("teams").delete().eq("id", selectedTeam.id)
-
+      const { error } = await supabase
+        .from("teams")
+        .delete()
+        .eq("id", selectedTeam.id)
       if (error) throw error
-
-      toast({
-        title: "Team deleted",
-        description: "The team has been deleted successfully",
-      })
-
+      toast({ title: "Team Deleted", description: "Team has been deleted successfully.", variant: "default" })
       setIsDeleteDialogOpen(false)
       fetchTeams()
     } catch (error) {
-      console.error("Error deleting team:", error)
-      toast({
-        title: "Error deleting team",
-        description: error.message,
-        variant: "destructive",
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to delete team", 
+        variant: "destructive" 
       })
+    }
+  }
+
+  const handleSyncMemberCounts = async () => {
+    setSyncingCounts(true)
+    try {
+      console.log("Starting sync of all team member counts...");
+      
+      const { error } = await supabase.rpc('sync_all_team_member_counts')
+      if (error) throw error
+      
+      console.log("Sync completed successfully");
+      toast({ title: "Sync Complete", description: "All team member counts have been synchronized.", variant: "default" })
+      fetchTeams() // Refresh the data
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to sync member counts", 
+        variant: "destructive" 
+      })
+    } finally {
+      setSyncingCounts(false)
+    }
+  }
+
+  const handleTestTrigger = async () => {
+    try {
+      console.log("Testing trigger functionality...");
+      
+      // Get a sample team
+      const { data: sampleTeam } = await supabase
+        .from("teams")
+        .select("id, member_count")
+        .limit(1)
+        .single();
+      
+      if (!sampleTeam) {
+        toast({ title: "No teams found", description: "Cannot test trigger without teams", variant: "destructive" });
+        return;
+      }
+      
+      console.log(`Testing with team ${sampleTeam.id}, current count: ${sampleTeam.member_count}`);
+      
+      // Test the trigger by inserting a temporary member (will be deleted)
+      const testUserId = "00000000-0000-0000-0000-000000000000"; // Dummy UUID
+      
+      const { error: insertError } = await supabase
+        .from("team_members")
+        .insert({ team_id: sampleTeam.id, user_id: testUserId, role: "member" });
+      
+      if (insertError) {
+        console.error("Insert test failed:", insertError);
+        toast({ title: "Test Failed", description: "Could not test trigger", variant: "destructive" });
+        return;
+      }
+      
+      console.log("Test member inserted, checking if count increased...");
+      
+      // Check if count increased
+      const { data: afterInsert } = await supabase
+        .from("teams")
+        .select("member_count")
+        .eq("id", sampleTeam.id)
+        .single();
+      
+      console.log(`Count after insert: ${afterInsert?.member_count}`);
+      
+      // Delete the test member
+      const { error: deleteError } = await supabase
+        .from("team_members")
+        .delete()
+        .eq("team_id", sampleTeam.id)
+        .eq("user_id", testUserId);
+      
+      if (deleteError) {
+        console.error("Delete test failed:", deleteError);
+      }
+      
+      // Check if count decreased
+      const { data: afterDelete } = await supabase
+        .from("teams")
+        .select("member_count")
+        .eq("id", sampleTeam.id)
+        .single();
+      
+      console.log(`Count after delete: ${afterDelete?.member_count}`);
+      
+      const triggerWorking = afterInsert?.member_count === sampleTeam.member_count + 1 && 
+                            afterDelete?.member_count === sampleTeam.member_count;
+      
+      if (triggerWorking) {
+        toast({ title: "Trigger Test Passed", description: "Database trigger is working correctly", variant: "default" });
+      } else {
+        toast({ title: "Trigger Test Failed", description: "Database trigger may not be working", variant: "destructive" });
+      }
+      
+      fetchTeams(); // Refresh the data
+      
+    } catch (error) {
+      console.error("Test error:", error);
+      toast({ title: "Test Error", description: "Failed to test trigger", variant: "destructive" });
     }
   }
 
@@ -182,10 +288,32 @@ async function fetchTeams() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline" size="sm">
-          <Filter className="mr-2 h-4 w-4" />
-          Filter
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSyncMemberCounts}
+            disabled={syncingCounts}
+          >
+            {syncingCounts ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Users className="mr-2 h-4 w-4" />
+            )}
+            {syncingCounts ? "Syncing..." : "Sync Member Counts"}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleTestTrigger}
+          >
+            Test Trigger
+          </Button>
+          <Button variant="outline" size="sm">
+            <Filter className="mr-2 h-4 w-4" />
+            Filter
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-md">

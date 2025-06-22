@@ -141,13 +141,46 @@ export function Dashboard() {
 
     const fetchTeamInfo = async () => {
       if (!user?.team_id) return;
-      const { data, error } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("id", user.team_id)
-        .single();
-      if (!error && data) {
-        setTeamInfo(data);
+      
+      try {
+        // Fetch team info with dynamic member count calculation
+        const { data: team, error: teamError } = await supabase
+          .from("teams")
+          .select(`
+            *,
+            team_members!inner(user_id)
+          `)
+          .eq("id", user.team_id)
+          .single();
+          
+        if (teamError) throw teamError;
+        
+        if (team) {
+          // Calculate member count from team_members
+          const memberCount = team.team_members?.length || 0;
+          
+          // Create team info with correct member count
+          const teamInfoWithCount = {
+            ...team,
+            member_count: memberCount
+          };
+          
+          setTeamInfo(teamInfoWithCount);
+          console.log(`Team ${team.name} has ${memberCount} members`);
+        }
+      } catch (error) {
+        console.error("Error fetching team info:", error);
+        
+        // Fallback: fetch basic team info
+        const { data: basicTeam, error: basicError } = await supabase
+          .from("teams")
+          .select("*")
+          .eq("id", user.team_id)
+          .single();
+          
+        if (!basicError && basicTeam) {
+          setTeamInfo(basicTeam);
+        }
       }
     };
 
@@ -157,7 +190,8 @@ export function Dashboard() {
         .from("user_activity")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10);
       if (!error && Array.isArray(data)) {
         setRecentActivity(data);
       }
@@ -202,9 +236,20 @@ export function Dashboard() {
       )
       .subscribe();
 
+    // Real-time subscription for team_members (to update team info when members change)
+    const teamMembersChannel = supabase
+      .channel('team_members_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'team_members' },
+        () => fetchTeamInfo()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(activityChannel);
+      supabase.removeChannel(teamMembersChannel);
     };
   }, [user?.id, user?.team_id, supabase]);
 

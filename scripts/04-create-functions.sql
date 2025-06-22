@@ -224,3 +224,50 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Function to recalculate team member counts
+CREATE OR REPLACE FUNCTION recalculate_team_member_counts()
+RETURNS void AS $$
+BEGIN
+  UPDATE teams 
+  SET member_count = (
+    SELECT COUNT(*) 
+    FROM team_members 
+    WHERE team_members.team_id = teams.id
+  ),
+  updated_at = NOW();
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to update a specific team's member count
+CREATE OR REPLACE FUNCTION update_specific_team_member_count(team_id_param UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE teams 
+  SET member_count = (
+    SELECT COUNT(*) 
+    FROM team_members 
+    WHERE team_members.team_id = team_id_param
+  ),
+  updated_at = NOW()
+  WHERE id = team_id_param;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to sync all team member counts (fix inconsistencies)
+CREATE OR REPLACE FUNCTION sync_all_team_member_counts()
+RETURNS void AS $$
+BEGIN
+  -- Update all teams with correct member counts
+  UPDATE teams 
+  SET member_count = (
+    SELECT COUNT(*) 
+    FROM team_members 
+    WHERE team_members.team_id = teams.id
+  ),
+  updated_at = NOW();
+  
+  -- Log the sync operation
+  RAISE NOTICE 'Synced member counts for all teams';
+END;
+$$ LANGUAGE plpgsql;

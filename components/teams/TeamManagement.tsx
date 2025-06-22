@@ -90,6 +90,34 @@ export function TeamManagement() {
     fetchTeamInfo();
   }, [user?.team_id, supabase]);
 
+  // Helper function to update team member count
+  const updateTeamMemberCount = async (teamId: string) => {
+    try {
+      console.log(`Calling update_specific_team_member_count for team ${teamId}`);
+      
+      const { error } = await supabase.rpc('update_specific_team_member_count', {
+        team_id_param: teamId
+      });
+      
+      if (error) {
+        console.error('Error updating team member count:', error);
+      } else {
+        console.log('Team member count update function called successfully');
+        
+        // Verify the update worked
+        const { data: team } = await supabase
+          .from("teams")
+          .select("member_count")
+          .eq("id", teamId)
+          .single();
+        
+        console.log(`Team ${teamId} member count after update: ${team?.member_count}`);
+      }
+    } catch (error) {
+      console.error('Error updating team member count:', error);
+    }
+  };
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamName || !teamCity) {
@@ -131,6 +159,7 @@ export function TeamManagement() {
           city: teamCity,
           created_by: user.id,
           invite_code: inviteCode,
+          member_count: 1,
         })
         .select()
         .single();
@@ -183,6 +212,7 @@ export function TeamManagement() {
       });
       setIsCreating(false);
       setShowQrCode(true);
+      await updateTeamMemberCount(team.id);
     } catch (error: any) {
       console.error("Team creation error:", error);
       let description = "Failed to create team";
@@ -210,6 +240,8 @@ export function TeamManagement() {
     if (!teamInfo || !isAdmin || memberId === user?.id) return;
     
     try {
+      console.log(`Removing member ${memberId} from team ${teamInfo.id}`);
+      
       // Remove from team_members
       const { error: memberError } = await supabase
         .from("team_members")
@@ -219,6 +251,8 @@ export function TeamManagement() {
       
       if (memberError) throw memberError;
       
+      console.log("Member removed from team_members table");
+      
       // Update user's team_id to null
       const { error: profileError } = await supabase
         .from("profiles")
@@ -226,6 +260,8 @@ export function TeamManagement() {
         .eq("id", memberId);
       
       if (profileError) throw profileError;
+      
+      console.log("User profile updated to remove team_id");
       
       // Log activity
       await supabase.from("user_activity").insert({
@@ -236,6 +272,8 @@ export function TeamManagement() {
         related_id: teamInfo.id,
         related_type: "team",
       });
+      
+      console.log("Activity logged");
       
       // Refetch team info
       const { data: updatedTeam } = await supabase
@@ -259,6 +297,7 @@ export function TeamManagement() {
           points: m.profiles?.total_points || 0,
         }));
         setTeamInfo(updatedTeam);
+        console.log(`Team updated, new member count: ${updatedTeam.member_count}`);
       }
 
       toast({
@@ -266,7 +305,22 @@ export function TeamManagement() {
         description: "The member has been removed from the team.",
         variant: "default",
       })
+      
+      // Manually update team member count
+      console.log("Manually updating team member count...");
+      await updateTeamMemberCount(teamInfo.id);
+      
+      // Verify the count was updated
+      const { data: finalTeam } = await supabase
+        .from("teams")
+        .select("member_count")
+        .eq("id", teamInfo.id)
+        .single();
+      
+      console.log(`Final team member count: ${finalTeam?.member_count}`);
+      
     } catch (error: any) {
+      console.error("Error removing member:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to remove member",
@@ -309,6 +363,7 @@ export function TeamManagement() {
         }));
         setTeamInfo(updatedTeam);
       }
+      await updateTeamMemberCount(teamInfo.id);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to promote member", variant: "destructive" });
     }
@@ -354,6 +409,7 @@ export function TeamManagement() {
       })
 
       setIsEditing(false)
+      await updateTeamMemberCount(teamInfo.id);
     } catch (error: any) {
       console.error("Team update error:", error)
       toast({
@@ -423,15 +479,24 @@ export function TeamManagement() {
         setLoading(false);
         return;
       }
+      
+      console.log(`Found team: ${team.name} with current member count: ${team.member_count}`);
+      
       const { error: memberError } = await supabase
         .from("team_members")
         .insert({ team_id: team.id, user_id: user.id, role: "member" });
       if (memberError) throw memberError;
+      
+      console.log("User added to team_members table");
+      
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ team_id: team.id })
         .eq("id", user.id);
       if (profileError) throw profileError;
+      
+      console.log("User profile updated with team_id");
+      
       await supabase.from("user_activity").insert({
         user_id: user.id,
         activity_type: "team_join",
@@ -440,11 +505,15 @@ export function TeamManagement() {
         related_id: team.id,
         related_type: "team",
       });
+      
+      console.log("Activity logged");
+      
       toast({
         title: "Team Joined",
         description: `You have successfully joined ${team.name}.`,
         variant: "success",
       });
+      
       // Refetch team info
       const { data: updatedTeam } = await supabase
         .from("teams")
@@ -452,6 +521,8 @@ export function TeamManagement() {
         .eq("id", team.id)
         .single();
       if (updatedTeam) {
+        console.log(`Team refetched, member count: ${updatedTeam.member_count}`);
+        
         const { data: members } = await supabase
           .from("team_members")
           .select("user_id, role, profiles(name, email, avatar_url, total_points)")
@@ -465,7 +536,22 @@ export function TeamManagement() {
           points: m.profiles?.total_points || 0,
         }));
         setTeamInfo(updatedTeam);
+        console.log(`Team members fetched: ${members?.length || 0} members`);
       }
+      
+      // Manually update team member count
+      console.log("Manually updating team member count...");
+      await updateTeamMemberCount(team.id);
+      
+      // Verify the count was updated
+      const { data: finalTeam } = await supabase
+        .from("teams")
+        .select("member_count")
+        .eq("id", team.id)
+        .single();
+      
+      console.log(`Final team member count: ${finalTeam?.member_count}`);
+      
     } catch (error: any) {
       console.error("Join team error:", error);
       toast({
@@ -518,6 +604,7 @@ export function TeamManagement() {
           description: "You have left the team successfully.",
           variant: "default",
         })
+        await updateTeamMemberCount(teamInfo.id);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -670,6 +757,7 @@ export function TeamManagement() {
     const { data: updatedTeam } = await supabase.from("teams").select("*").eq("id", teamInfo.id).single()
     if (updatedTeam) setTeamInfo({ ...teamInfo, profile_image_url: updatedTeam.profile_image_url })
     toast({ title: "Team Image Updated", description: "Profile image updated successfully.", variant: "success" })
+    await updateTeamMemberCount(teamInfo.id);
   }
 
   return (
@@ -813,7 +901,7 @@ export function TeamManagement() {
                 <div className="mt-4 flex items-center space-x-2">
                   <Badge variant="secondary">
                     <Users className="w-4 h-4 mr-1" />
-                    {teamInfo.members ? teamInfo.members.length : 0} Members
+                    {teamInfo.member_count || 0} Members
                   </Badge>
                   <Badge variant="outline">
                     <Crown className="w-4 h-4 mr-1" />

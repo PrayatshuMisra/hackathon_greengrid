@@ -67,6 +67,31 @@ export function Leaderboard() {
       }
     };
     fetchLeaderboards();
+
+    // Real-time subscription for team_members changes
+    const teamMembersChannel = supabase
+      .channel('leaderboard_team_members_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'team_members' },
+        () => fetchLeaderboards()
+      )
+      .subscribe();
+
+    // Real-time subscription for profiles changes (team_id updates)
+    const profilesChannel = supabase
+      .channel('leaderboard_profiles_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => fetchLeaderboards()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(teamMembersChannel);
+      supabase.removeChannel(profilesChannel);
+    };
   }, [supabase]);
 
   useEffect(() => {

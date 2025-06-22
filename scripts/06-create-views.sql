@@ -29,7 +29,7 @@ SELECT
   t.city,
   t.total_points,
   t.rank,
-  t.member_count,
+  COUNT(DISTINCT p.id) as member_count,
   t.created_at,
   COUNT(DISTINCT uc.id) as total_challenges_completed,
   COUNT(DISTINCT ub.id) as total_badges_earned,
@@ -38,7 +38,7 @@ FROM teams t
 LEFT JOIN profiles p ON t.id = p.team_id
 LEFT JOIN user_challenges uc ON p.id = uc.user_id AND uc.status = 'completed'
 LEFT JOIN user_badges ub ON p.id = ub.user_id
-GROUP BY t.id, t.name, t.description, t.city, t.total_points, t.rank, t.member_count, t.created_at
+GROUP BY t.id, t.name, t.description, t.city, t.total_points, t.rank, t.created_at
 ORDER BY t.total_points DESC, t.created_at ASC;
 
 -- View for challenge statistics

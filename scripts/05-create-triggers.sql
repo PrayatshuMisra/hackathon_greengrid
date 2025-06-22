@@ -1,4 +1,6 @@
 -- Trigger for team member count updates
+-- This trigger automatically updates team.member_count when team_members table changes
+DROP TRIGGER IF EXISTS trigger_update_team_member_count ON team_members;
 CREATE TRIGGER trigger_update_team_member_count
   AFTER INSERT OR DELETE ON team_members
   FOR EACH ROW EXECUTE FUNCTION update_team_member_count();
