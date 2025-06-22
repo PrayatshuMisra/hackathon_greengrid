@@ -384,6 +384,7 @@ export function Community() {
       );
 
       if (post && post.author_id && post.author_id !== user.id) {
+        console.log("[Notification] Creating for user_id (post.author_id):", post.author_id);
         await supabase.from("notifications").insert({
           user_id: post.author_id,
           title: "New Reply on Your Post",
@@ -588,6 +589,7 @@ export function Community() {
           .eq("id", commentId);
 
         if (comment && comment.author_id && comment.author_id !== user.id) {
+          console.log("[Notification] Creating for user_id (comment.author_id):", comment.author_id);
           const parentPost = forumPosts.find(p => p.id === comment.post_id);
           await supabase.from("notifications").insert({
             user_id: comment.author_id,
@@ -702,6 +704,7 @@ export function Community() {
           .eq("id", postId);
 
         if (authorId && authorId !== user.id) {
+          console.log("[Notification] Creating for user_id (authorId):", authorId);
           await supabase.from("notifications").insert({
             user_id: authorId,
             title: "New Like on Your Post",
@@ -1113,7 +1116,7 @@ export function Community() {
                             className="flex items-center space-x-1 hover:text-blue-600"
                           >
                             <MessageSquare className="h-4 w-4" />
-                            <span>{post.reply_count}</span>
+                            <span>Replies and Comments</span>
                           </button>
                           <button
                             onClick={() => handleSharePost(post.id, post.title)}
