@@ -89,27 +89,25 @@ export default function UsersAdmin() {
     if (!selectedUser) return
     setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_edit']: true }))
     try {
-      const res = await fetch("/api/admin/update-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUser.id, update: formData })
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Unknown error")
+      const { error } = await supabase
+        .from('profiles')
+        .update(formData)
+        .eq('id', selectedUser.id)
+      if (error) throw error
       toast({
-        title: "User updated",
-        description: "The user has been updated successfully",
+        title: 'User updated',
+        description: 'The user has been updated successfully',
       })
       setIsEditDialogOpen(false)
       fetchUsers()
     } catch (error) {
-      console.error("Error updating user:", error)
+      console.error('Error updating user:', error)
       toast({
-        title: "Error updating user",
+        title: 'Error updating user',
         description: (error && typeof error === 'object' && 'message' in error)
           ? (error as any).message
           : String(error || 'Unknown error'),
-        variant: "destructive",
+        variant: 'destructive',
       })
     } finally {
       setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_edit']: false }))
@@ -120,22 +118,22 @@ export default function UsersAdmin() {
     if (!selectedUser) return
     setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_delete']: true }))
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", selectedUser.id)
+      const { error } = await supabase.from('profiles').delete().eq('id', selectedUser.id)
       if (error) throw error
       toast({
-        title: "User deleted",
-        description: "The user has been deleted successfully",
+        title: 'User deleted',
+        description: 'The user has been deleted successfully',
       })
       setIsDeleteDialogOpen(false)
       fetchUsers()
     } catch (error) {
-      console.error("Error deleting user:", error)
+      console.error('Error deleting user:', error)
       toast({
-        title: "Error deleting user",
+        title: 'Error deleting user',
         description: (error && typeof error === 'object' && 'message' in error)
           ? (error as any).message
           : String(error || 'Unknown error'),
-        variant: "destructive",
+        variant: 'destructive',
       })
     } finally {
       setActionLoading((prev) => ({ ...prev, [selectedUser.id + '_delete']: false }))
@@ -145,28 +143,42 @@ export default function UsersAdmin() {
   const handleToggleUserStatus = async (user: User) => {
     setActionLoading((prev) => ({ ...prev, [user.id + '_status']: true }))
     try {
-      const newStatus = user.status === "active" ? "suspended" : "active"
-      const res = await fetch("/api/admin/update-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, update: { status: newStatus } })
-      })
-      const result = await res.json()
-      if (!res.ok) throw new Error(result.error || "Unknown error")
+      const newStatus = user.status === 'active' ? 'suspended' : 'active'
+      // Update user status
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('id', user.id)
+      if (profileError) throw profileError
+      // Update user_challenges status as well
+      let challengeError
+      if (newStatus === 'suspended') {
+        ({ error: challengeError } = await supabase
+          .from('user_challenges')
+          .update({ status: 'suspended' })
+          .eq('user_id', user.id))
+      } else if (newStatus === 'active') {
+        ({ error: challengeError } = await supabase
+          .from('user_challenges')
+          .update({ status: 'active' })
+          .eq('user_id', user.id)
+          .eq('status', 'suspended'))
+      }
+      if (challengeError) throw challengeError
       toast({
-        title: `User ${newStatus === "active" ? "activated" : "suspended"}`,
-        description: `${user.name} has been ${newStatus === "active" ? "activated" : "suspended"} successfully`,
+        title: `User ${newStatus === 'active' ? 'activated' : 'suspended'}`,
+        description: `${user.name} has been ${newStatus === 'active' ? 'activated' : 'suspended'} successfully`,
       })
       setConfirmStatusUser(null)
       fetchUsers()
     } catch (error) {
-      console.error("Error updating user status:", error)
+      console.error('Error updating user status:', error)
       toast({
-        title: "Error updating user status",
+        title: 'Error updating user status',
         description: (error && typeof error === 'object' && 'message' in error)
           ? (error as any).message
           : String(error || 'Unknown error'),
-        variant: "destructive",
+        variant: 'destructive',
       })
     } finally {
       setActionLoading((prev) => ({ ...prev, [user.id + '_status']: false }))

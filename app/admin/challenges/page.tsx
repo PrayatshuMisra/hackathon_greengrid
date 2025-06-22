@@ -88,18 +88,36 @@ export default function ChallengesAdmin() {
 
   const handleCreateChallenge = async (formData: Partial<Challenge>) => {
     try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
+        toast({
+          title: 'Error creating challenge',
+          description: 'You must be logged in to create a challenge.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const formDataWithCreator = { ...formData, created_by: userData.user.id };
       const { data, error } = await supabase
         .from("challenges")
-        .insert([formData])
+        .insert([formDataWithCreator])
         .select();
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating challenge:", error.message);
+        toast({
+          title: 'Error creating challenge',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
         title: "Challenge created",
         description: "The challenge has been created successfully",
       });
       setIsCreateDialogOpen(false);
       fetchChallenges();
-    } catch (error: unknown) {
+    } catch (error) {
       console.error("Error creating challenge:", error);
       toast({
         title: "Error creating challenge",
