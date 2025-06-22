@@ -1,30 +1,35 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence, Variants } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { AIVerification } from "@/components/ai/AIVerification"
-import { Camera, Upload, Calendar, MapPin } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import { useApp } from "@/app/providers"
-import { toast } from "react-hot-toast";
-
+import { useToast } from "@/hooks/use-toast"
+import { Target, Upload, Users, Clock, Award, TrendingUp, Leaf, Zap, Droplets, Recycle } from "lucide-react"
+import { 
+  getAvailableChallenges, 
+  enrollUserInChallenge, 
+  checkUserEnrollment,
+  getUserChallenges 
+} from "@/lib/supabase"
 
 const MotionCard = motion(Card)
-const MotionDiv = motion.div
 const MotionButton = motion(Button)
+const MotionDiv = motion.div
 
 export function Challenges() {
   const { toast } = useToast()
@@ -35,105 +40,82 @@ export function Challenges() {
   const [showVerification, setShowVerification] = useState(false)
   const [joinDialogOpen, setJoinDialogOpen] = useState(false)
   const [joiningChallenge, setJoiningChallenge] = useState(false)
+  const [challenges, setChallenges] = useState<any[]>([])
+  const [userChallenges, setUserChallenges] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const [challenges, setChallenges] = useState([
-    {
-      id: 1,
-      title: "Plastic-Free Week Challenge",
-      description: "Avoid single-use plastics for 7 consecutive days",
-      category: "Waste Reduction",
-      points: 150,
-      participants: 1247,
-      timeLeft: "3 days",
-      difficulty: "Medium",
-      impact: "5kg plastic saved",
-      status: "active",
-      type: "plastic-free",
-      joined: false,
-    },
-    {
-      id: 2,
-      title: "Bike to Work/School",
-      description: "Use bicycle for daily commute for 5 days",
-      category: "Transportation",
-      points: 200,
-      participants: 892,
-      timeLeft: "1 week",
-      difficulty: "Easy",
-      impact: "12kg CO₂ reduced",
-      status: "active",
-      type: "bike-commute",
-      joined: false,
-    },
-    {
-      id: 3,
-      title: "Energy Saver Challenge",
-      description: "Reduce electricity consumption by 20%",
-      category: "Energy",
-      points: 300,
-      participants: 634,
-      timeLeft: "2 weeks",
-      difficulty: "Hard",
-      impact: "25kWh saved",
-      status: "active",
-      type: "energy-bill",
-      joined: false,
-    },
-    {
-      id: 4,
-      title: "Home Composting",
-      description: "Start composting kitchen waste",
-      category: "Waste Reduction",
-      points: 180,
-      participants: 445,
-      timeLeft: "5 days",
-      difficulty: "Medium",
-      impact: "3kg waste diverted",
-      status: "completed",
-      type: "composting",
-      joined: false,
-    },
-    {
-      id: 5,
-      title: "Grow Your Own Herbs",
-      description: "Plant and maintain a small herb garden",
-      category: "Food",
-      points: 120,
-      participants: 328,
-      timeLeft: "10 days",
-      difficulty: "Easy",
-      impact: "Local food production",
-      status: "active",
-      type: "plant-growing",
-      joined: false,
-    },
-    {
-      id: 6,
-      title: "Water Conservation",
-      description: "Reduce water usage by 15%",
-      category: "Water",
-      points: 250,
-      participants: 512,
-      timeLeft: "2 weeks",
-      difficulty: "Medium",
-      impact: "500L water saved",
-      status: "active",
-      type: "water-bill",
-      joined: false,
-    },
-  ])
+  useEffect(() => {
+    const fetchChallenges = async () => {
+      if (!user?.id) return
+
+      try {
+        setLoading(true)
+        
+        // Fetch available challenges
+        const { data: challengesData, error: challengesError } = await getAvailableChallenges()
+        if (challengesError) {
+          console.error("Error fetching challenges:", challengesError)
+        } else {
+          setChallenges(challengesData || [])
+        }
+
+        // Fetch user's enrolled challenges
+        const { data: userChallengesData, error: userChallengesError } = await getUserChallenges(user.id)
+        if (userChallengesError) {
+          console.error("Error fetching user challenges:", userChallengesError)
+        } else {
+          setUserChallenges(userChallengesData || [])
+        }
+      } catch (error) {
+        console.error("Error fetching challenges:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchChallenges()
+  }, [user?.id])
 
   const filteredChallenges = challenges.filter((challenge) => {
-    if (selectedCategory !== "all" && challenge.category.toLowerCase() !== selectedCategory) return false
-    if (selectedStatus !== "all" && challenge.status !== selectedStatus) return false
+    if (selectedCategory !== "all" && challenge.challenge_category?.name?.toLowerCase() !== selectedCategory) return false
+    if (selectedStatus !== "all") {
+      const userChallenge = userChallenges.find(uc => uc.challenge_id === challenge.id)
+      if (selectedStatus === "active" && (!userChallenge || userChallenge.status !== "active")) return false
+      if (selectedStatus === "completed" && (!userChallenge || userChallenge.status !== "completed")) return false
+    }
     return true
   })
+
+  const isUserEnrolled = (challengeId: string) => {
+    return userChallenges.some(uc => uc.challenge_id === challengeId)
+  }
+
+  const getUserChallengeStatus = (challengeId: string) => {
+    const userChallenge = userChallenges.find(uc => uc.challenge_id === challengeId)
+    return userChallenge?.status || null
+  }
+
+  const getUserChallengeProgress = (challengeId: string) => {
+    const userChallenge = userChallenges.find(uc => uc.challenge_id === challengeId)
+    return userChallenge?.progress || 0
+  }
 
   const handleVerificationComplete = (result: any) => {
     console.log("Verification result:", result)
     
     if (result.success) {
-    
+      toast({
+        title: "Verification Successful!",
+        description: "Your challenge proof has been verified.",
+        variant: "success",
+      })
+      setShowVerification(false)
+    } else {
+      toast({
+        title: "Verification Failed",
+        description: result.message || "Your submission could not be verified.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -143,18 +125,44 @@ export function Challenges() {
   }
 
   const handleJoinChallenge = async () => {
-    if (!selectedChallenge) return
+    if (!selectedChallenge || !user?.id) return
 
     setJoiningChallenge(true)
 
     try {
-      const updatedChallenges = challenges.map((challenge) =>
-        challenge.id === selectedChallenge.id
-          ? { ...challenge, joined: true, participants: challenge.participants + 1 }
-          : challenge,
-      )
+      // Check if user is already enrolled
+      const { enrolled } = await checkUserEnrollment(user.id, selectedChallenge.id)
+      
+      if (enrolled) {
+        toast({
+          title: "Already Enrolled",
+          description: "You are already enrolled in this challenge.",
+          variant: "default",
+        })
+        setJoinDialogOpen(false)
+        return
+      }
 
-      setChallenges(updatedChallenges)
+      // Enroll user in challenge
+      const { success, error } = await enrollUserInChallenge(user.id, selectedChallenge.id)
+      
+      if (!success) {
+        throw error
+      }
+
+      // Update local state
+      const newUserChallenge = {
+        id: success.data.id,
+        user_id: user.id,
+        challenge_id: selectedChallenge.id,
+        status: 'active',
+        progress: 0,
+        points_earned: 0,
+        started_at: new Date().toISOString(),
+        challenge: selectedChallenge
+      }
+      
+      setUserChallenges(prev => [...prev, newUserChallenge])
 
       setJoinDialogOpen(false)
 
@@ -167,7 +175,7 @@ export function Challenges() {
       console.error("Error joining challenge:", error)
       toast({
         title: "Error",
-        description: "Failed to join challenge. Please try again.",
+        description: error.message || "Failed to join challenge. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -225,80 +233,68 @@ export function Challenges() {
     }
   }
 
-  const badgeVariants: Variants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: { 
-      opacity: 1, 
-      scale: 1,
-      transition: {
-        duration: 0.3,
-        delay: 0.2
-      }
-    }
-  }
-
   const buttonVariants: Variants = {
-    hover: {
+    hover: { 
       scale: 1.05,
-      transition: {
-        duration: 0.2
-      }
+      transition: { duration: 0.2 }
     },
-    tap: {
+    tap: { 
       scale: 0.95,
-      transition: {
-        duration: 0.1
-      }
+      transition: { duration: 0.1 }
     }
   }
 
-  const eventVariants: Variants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { 
-      opacity: 1, 
-      x: 0,
-      transition: {
-        duration: 0.4
-      }
-    },
-    hover: {
-      x: 4,
-      transition: {
-        duration: 0.2
-      }
+  const getCategoryIcon = (categoryName: string) => {
+    const iconMap: { [key: string]: any } = {
+      'Energy': Zap,
+      'Transportation': Users,
+      'Waste Reduction': Recycle,
+      'Water': Droplets,
+      'Food': Leaf,
+      'Air Quality': TrendingUp
     }
+    return iconMap[categoryName] || Target
+  }
+
+  const getDifficultyColor = (difficulty: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Easy': 'bg-green-100 text-green-800',
+      'Medium': 'bg-yellow-100 text-yellow-800',
+      'Hard': 'bg-red-100 text-red-800'
+    }
+    return colorMap[difficulty] || 'bg-gray-100 text-gray-800'
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading challenges...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <MotionDiv 
-      className="space-y-6"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
+    <div className="space-y-8">
       {/* Header */}
-      <MotionDiv 
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0"
+      <MotionDiv
+        className="text-center space-y-4"
         variants={headerVariants}
+        initial="hidden"
+        animate="visible"
       >
-        <div>
-          <motion.h2 
-            className="text-2xl font-bold text-green-800"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            Eco Challenges
-          </motion.h2>
-          <motion.p 
-            className="text-green-600"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            Join challenges and make a positive impact
-          </motion.p>
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold text-green-800">
+            Environmental Challenges
+          </h1>
+          <p className="text-lg text-green-600 max-w-2xl mx-auto">
+            Join challenges to make a positive impact on the environment and earn EcoPoints
+          </p>
         </div>
+
+        {/* Filters */}
         <MotionDiv 
           className="flex space-x-2"
           initial={{ opacity: 0, x: 20 }}
@@ -326,180 +322,174 @@ export function Challenges() {
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
             </SelectContent>
           </Select>
         </MotionDiv>
       </MotionDiv>
 
       {/* Challenge Grid */}
-      <MotionDiv 
+      <MotionDiv
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         variants={containerVariants}
+        initial="hidden"
+        animate="visible"
       >
         <AnimatePresence>
-          {filteredChallenges.map((challenge, index) => (
-            <MotionCard 
-              key={challenge.id} 
-              className="border-green-200 hover:shadow-lg transition-shadow"
-              variants={cardVariants}
-              whileHover="hover"
-              layout
-              layoutId={`challenge-${challenge.id}`}
-            >
-              <CardHeader>
-                <MotionDiv 
-                  className="flex justify-between items-start"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <motion.div variants={badgeVariants}>
-                    <Badge
-                      variant="secondary"
-                      className={`${
-                        challenge.category === "Energy"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : challenge.category === "Transportation"
-                            ? "bg-blue-100 text-blue-800"
-                            : challenge.category === "Water"
-                              ? "bg-cyan-100 text-cyan-800"
-                              : challenge.category === "Food"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-green-100 text-green-800"
-                      }`}
-                    >
-                      {challenge.category}
-                    </Badge>
-                  </motion.div>
-                  <motion.div variants={badgeVariants}>
-                    <Badge
-                      variant="outline"
-                      className={`${
-                        challenge.difficulty === "Easy"
-                          ? "border-green-300 text-green-700"
-                          : challenge.difficulty === "Medium"
-                            ? "border-yellow-300 text-yellow-700"
-                            : "border-red-300 text-red-700"
-                      }`}
-                    >
+          {filteredChallenges.map((challenge) => {
+            const CategoryIcon = getCategoryIcon(challenge.challenge_category?.name)
+            const isEnrolled = isUserEnrolled(challenge.id)
+            const userStatus = getUserChallengeStatus(challenge.id)
+            const userProgress = getUserChallengeProgress(challenge.id)
+            
+            return (
+              <MotionCard
+                key={challenge.id}
+                className="group cursor-pointer border-2 hover:border-green-300 transition-all duration-300"
+                variants={cardVariants}
+                whileHover="hover"
+                layout
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <CategoryIcon className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs"
+                        >
+                          {challenge.challenge_category?.name || "Uncategorized"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Badge className={getDifficultyColor(challenge.difficulty)}>
                       {challenge.difficulty}
                     </Badge>
-                  </motion.div>
-                </MotionDiv>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <CardTitle className="text-green-800">{challenge.title}</CardTitle>
-                  <CardDescription>{challenge.description}</CardDescription>
-                </motion.div>
-              </CardHeader>
-              <CardContent>
-                <MotionDiv 
-                  className="space-y-3"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Reward</span>
-                    <motion.span 
-                      className="font-semibold text-green-600"
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.4, type: "spring" }}
-                    >
-                      {challenge.points} EcoPoints
-                    </motion.span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Impact</span>
-                    <motion.span 
-                      className="font-semibold text-blue-600"
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.5, type: "spring" }}
-                    >
-                      {challenge.impact}
-                    </motion.span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Participants</span>
-                    <motion.span 
-                      className="font-semibold"
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.6, type: "spring" }}
-                    >
-                      {challenge.participants}
-                    </motion.span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Time Left</span>
-                    <motion.span 
-                      className="font-semibold text-orange-600"
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.7, type: "spring" }}
-                    >
-                      {challenge.timeLeft}
-                    </motion.span>
-                  </div>
+                  <CardTitle className="text-lg leading-tight">
+                    {challenge.title}
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    {challenge.description}
+                  </CardDescription>
+                </CardHeader>
 
-                  <MotionButton
-                    className="w-full mt-4 bg-green-600 hover:bg-green-700"
-                    disabled={challenge.status === "completed" || challenge.joined}
-                    onClick={() => openJoinDialog(challenge)}
-                    variants={buttonVariants}
-                    whileHover="hover"
-                    whileTap="tap"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8 }}
+                <CardContent>
+                  <MotionDiv 
+                    className="space-y-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
                   >
-                    {challenge.status === "completed"
-                      ? "Completed"
-                      : challenge.joined
-                        ? "Already Joined"
-                        : "Join Challenge"}
-                  </MotionButton>
-                </MotionDiv>
-              </CardContent>
-            </MotionCard>
-          ))}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Reward</span>
+                      <motion.span 
+                        className="font-semibold text-green-600"
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.4, type: "spring" }}
+                      >
+                        {challenge.points} EcoPoints
+                      </motion.span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Duration</span>
+                      <motion.span 
+                        className="font-semibold text-blue-600"
+                        initial={{ scale: 0.8 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.5, type: "spring" }}
+                      >
+                        {challenge.duration_days} days
+                      </motion.span>
+                    </div>
+
+                    {isEnrolled && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Progress</span>
+                          <span className="font-medium">{userProgress}%</span>
+                        </div>
+                        <Progress value={userProgress} className="h-2" />
+                      </div>
+                    )}
+
+                    <MotionButton
+                      className="w-full mt-4"
+                      disabled={userStatus === "completed"}
+                      onClick={() => {
+                        if (isEnrolled && userStatus === "active") {
+                          handleSubmitProof(challenge)
+                        } else if (!isEnrolled) {
+                          openJoinDialog(challenge)
+                        }
+                      }}
+                      variants={buttonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8 }}
+                    >
+                      {userStatus === "completed"
+                        ? "Completed"
+                        : isEnrolled
+                          ? "Submit Proof"
+                          : "Join Challenge"}
+                    </MotionButton>
+                  </MotionDiv>
+                </CardContent>
+              </MotionCard>
+            )
+          })}
         </AnimatePresence>
       </MotionDiv>
 
       {/* Join Challenge Dialog */}
       <AnimatePresence>
-        {joinDialogOpen && (
+        {joinDialogOpen && selectedChallenge && (
           <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.3 }}
               >
                 <DialogHeader>
-                  <DialogTitle>Join {selectedChallenge?.title}</DialogTitle>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Target className="h-5 w-5 text-green-600" />
+                    <span>Join Challenge</span>
+                  </DialogTitle>
                   <DialogDescription>
-                    Ready to take on this eco-challenge? You'll earn {selectedChallenge?.points} EcoPoints upon completion.
+                    Are you ready to make a difference? Join this challenge and start earning EcoPoints.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <motion.div 
-                    className="p-4 bg-green-50 rounded-lg"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    <h4 className="font-semibold text-green-800 mb-2">Challenge Details:</h4>
-                    <p className="text-sm text-green-700">{selectedChallenge?.description}</p>
-                    <p className="text-sm text-green-600 mt-2">Expected Impact: {selectedChallenge?.impact}</p>
-                  </motion.div>
+                <div className="space-y-4 py-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-semibold text-green-800 mb-2">
+                      {selectedChallenge.title}
+                    </h4>
+                    <p className="text-sm text-green-600 mb-3">
+                      {selectedChallenge.description}
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Reward:</span>
+                        <div className="font-semibold text-green-600">
+                          {selectedChallenge.points} EcoPoints
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Duration:</span>
+                        <div className="font-semibold text-blue-600">
+                          {selectedChallenge.duration_days} days
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setJoinDialogOpen(false)}>
                       Cancel
@@ -522,102 +512,6 @@ export function Challenges() {
         )}
       </AnimatePresence>
 
-      {/* Proof Submission Section */}
-      <MotionCard
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <motion.div
-              initial={{ rotate: 0 }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-            >
-              <Camera className="h-5 w-5 text-green-600" />
-            </motion.div>
-            <span>Submit Challenge Proof</span>
-          </CardTitle>
-          <CardDescription>
-            Upload photos or documents to verify your eco-actions. Our AI will help validate your submissions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MotionDiv 
-            className="space-y-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-          >
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="Select active challenge" />
-              </SelectTrigger>
-              <SelectContent>
-                {challenges
-                  .filter((c) => c.joined || c.status === "active")
-                  .map((challenge) => (
-                    <SelectItem key={challenge.id} value={challenge.id.toString()}>
-                      {challenge.title}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-
-            <motion.div 
-              className="border-2 border-dashed border-green-300 rounded-lg p-6 text-center"
-              whileHover={{ 
-                borderColor: "#22c55e",
-                backgroundColor: "#f0fdf4",
-                transition: { duration: 0.2 }
-              }}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.7 }}
-            >
-              <motion.div
-                initial={{ y: 10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.8 }}
-              >
-                <Upload className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-sm text-gray-600 mb-2">Drag and drop your proof image here, or click to browse</p>
-                <MotionButton 
-                  variant="outline" 
-                  size="sm"
-                  variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  Choose File
-                </MotionButton>
-              </motion.div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
-            >
-              <Textarea placeholder="Add a description of your eco-action (optional)" className="resize-none" />
-            </motion.div>
-
-            <MotionButton 
-              className="w-full bg-green-600 hover:bg-green-700"
-              variants={buttonVariants}
-              whileHover="hover"
-              whileTap="tap"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-            >
-              Submit for Verification
-            </MotionButton>
-          </MotionDiv>
-        </CardContent>
-      </MotionCard>
-
       {/* AI Verification Dialog */}
       <AnimatePresence>
         {showVerification && selectedChallenge && (
@@ -636,7 +530,7 @@ export function Challenges() {
                   </DialogDescription>
                 </DialogHeader>
                 <AIVerification
-                  challengeType={selectedChallenge.type}
+                  challengeType={selectedChallenge.challenge_type}
                   onVerificationComplete={handleVerificationComplete}
                 />
               </motion.div>
@@ -644,114 +538,6 @@ export function Challenges() {
           </Dialog>
         )}
       </AnimatePresence>
-
-      {/* Upcoming Eco Events */}
-<MotionCard
-  initial={{ opacity: 0, y: 30 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.5 }}
->
-  <CardHeader>
-    <CardTitle className="flex items-center space-x-2">
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 0.3, delay: 0.6, type: "spring" }}
-      >
-        <Calendar className="h-5 w-5 text-green-600" />
-      </motion.div>
-      <span>Upcoming Eco Events</span>
-    </CardTitle>
-    <CardDescription>Join local events to make a bigger impact together</CardDescription>
-  </CardHeader>
-  <CardContent>
-    <MotionDiv
-      className="space-y-4"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {[
-        {
-          title: "Community Tree Plantation Drive",
-          date: "July 15, 2025",
-          location: "Central Park, Delhi",
-          organizer: "Green Delhi Initiative",
-          participants: 45,
-        },
-        {
-          title: "Plastic-Free Workshop",
-          date: "July 18, 2025",
-          location: "Online Event",
-          organizer: "Zero Waste India",
-          participants: 128,
-        },
-      ].map((event, index) => (
-        <motion.div
-          key={index}
-          className="border border-green-200 rounded-lg p-4 bg-green-50"
-          variants={eventVariants}
-          whileHover="hover"
-        >
-          <MotionDiv
-            className="flex justify-between items-start mb-2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <div>
-              <h4 className="font-semibold text-green-800">{event.title}</h4>
-              <p className="text-sm text-green-600">by {event.organizer}</p>
-            </div>
-            <motion.div
-              initial={{ scale: 0.8 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
-            >
-              <Badge variant="outline" className="text-green-700 border-green-300">
-                {event.participants} joined
-              </Badge>
-            </motion.div>
-          </MotionDiv>
-          <MotionDiv
-            className="flex items-center space-x-4 text-sm text-green-600 mb-3"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 + 0.1 }}
-          >
-            <div className="flex items-center space-x-1">
-              <Calendar className="h-4 w-4" />
-              <span>{event.date}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <MapPin className="h-4 w-4" />
-              <span>{event.location}</span>
-            </div>
-          </MotionDiv>
-          <MotionButton
-            size="sm"
-            className="bg-green-600 hover:bg-green-700"
-            variants={buttonVariants}
-            whileHover="hover"
-            whileTap="tap"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 + 0.3 }}
-            onClick={() =>
-            toast({
-            title: "Coming Soon!",
-            description: "Stay tuned for event participation.",
-            className: "bg-green-50 text-green-800 border border-green-200 shadow-md rounded-lg p-4",
-            })
-            }
-            >
-            Join Event
-          </MotionButton>
-        </motion.div>
-      ))}
-    </MotionDiv>
-  </CardContent>
-</MotionCard>
-    </MotionDiv>
+    </div>
   )
 }

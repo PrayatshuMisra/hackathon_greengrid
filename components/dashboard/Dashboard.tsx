@@ -24,6 +24,8 @@ import {
   CheckCircle,
   Clock,
   Users,
+  Trophy,
+  Sprout,
 } from "lucide-react";
 import { AIVerification } from "@/components/ai/AIVerification";
 import { DialogDescription } from "@radix-ui/react-dialog";
@@ -33,6 +35,12 @@ import { DialogContent } from "@radix-ui/react-dialog";
 import { Dialog } from "@radix-ui/react-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import {
+  getUserChallenges,
+  updateChallengeProgress,
+  getUserBadges,
+  awardBadgeToUser,
+} from "@/lib/supabase";
 
 export function Dashboard() {
   const { user, supabase } = useApp();
@@ -52,59 +60,41 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [submitProofOpen, setSubmitProofOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
+  const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
+  const [userBadges, setUserBadges] = useState<any[]>([]);
   const { toast } = useToast();
   const router = useRouter();
 
-  const [activeChallenges, setActiveChallenges] = useState([
-    {
-      id: 1,
-      title: "Plastic-Free Week Challenge",
-      description: "Avoid single-use plastics for 7 consecutive days",
-      progress: 60,
-      daysLeft: 3,
-      points: 150,
-      participants: 1247,
-      type: "plastic-free",
-    },
-    {
-      id: 2,
-      title: "Bike to Work/School",
-      description: "Use bicycle for daily commute for 5 days",
-      progress: 80,
-      daysLeft: 1,
-      points: 200,
-      participants: 892,
-      type: "bike-commute",
-    },
-  ]);
-
   useEffect(() => {
-    const fetchUserStats = async () => {
+    const fetchUserData = async () => {
       if (!user?.id) return;
 
       try {
-        const { data, error } = await supabase
+        setLoading(true);
+        
+        // Fetch user stats
+        const { data: statsData, error: statsError } = await supabase
           .from("user_dashboard_stats")
           .select("*")
           .eq("user_id", user.id)
           .single();
 
-        if (error && error.code !== "PGRST116") {
-          throw error;
+        if (statsError && statsError.code !== "PGRST116") {
+          throw statsError;
         }
 
-        if (data) {
+        if (statsData) {
           setUserStats({
-            totalPoints: data.total_points || 0,
-            rank: data.rank || 0,
-            challengesCompleted: data.challenges_completed || 0,
-            co2Saved: data.co2_saved || 0,
-            waterSaved: data.water_saved || 0,
-            plasticAvoided: data.plastic_avoided || 0,
-            treesPlanted: data.trees_planted || 0,
+            totalPoints: statsData.total_points || 0,
+            rank: statsData.rank || 0,
+            challengesCompleted: statsData.challenges_completed || 0,
+            co2Saved: statsData.co2_saved || 0,
+            waterSaved: statsData.water_saved || 0,
+            plasticAvoided: statsData.plastic_avoided || 0,
+            treesPlanted: statsData.trees_planted || 0,
             weeklyProgress: 75,
-            level: data.level || 1,
-            levelTitle: getLevelTitle(data.level || 1),
+            level: statsData.level || 1,
+            levelTitle: getLevelTitle(statsData.level || 1),
           });
         } else {
           const { data: profile } = await supabase
@@ -123,14 +113,31 @@ export function Dashboard() {
             });
           }
         }
+
+        // Fetch user challenges
+        const { data: challengesData, error: challengesError } = await getUserChallenges(user.id);
+        if (challengesError) {
+          console.error("Error fetching user challenges:", challengesError);
+        } else {
+          setActiveChallenges(challengesData || []);
+        }
+
+        // Fetch user badges
+        const { data: badgesData, error: badgesError } = await getUserBadges(user.id);
+        if (badgesError) {
+          console.error("Error fetching user badges:", badgesError);
+        } else {
+          setUserBadges(badgesData || []);
+        }
+
       } catch (error) {
-        console.error("Error fetching user stats:", error);
+        console.error("Error fetching user data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUserStats();
+    fetchUserData();
   }, [user?.id, supabase]);
 
   const getLevelTitle = (level: number) => {
@@ -148,15 +155,6 @@ export function Dashboard() {
     ];
     return titles[Math.min(level - 1, titles.length - 1)];
   };
-
-  const badges = [
-    { name: "Plastic-Free Warrior", icon: "🛡️", earned: true, rarity: "Epic" },
-    { name: "Energy Saver", icon: "⚡", earned: true, rarity: "Rare" },
-    { name: "Water Guardian", icon: "💧", earned: false, rarity: "Legendary" },
-    { name: "Green Commuter", icon: "🚲", earned: true, rarity: "Common" },
-    { name: "Compost Champion", icon: "🌱", earned: false, rarity: "Rare" },
-    { name: "Tree Planter", icon: "🌳", earned: true, rarity: "Epic" },
-  ];
 
   const recentActivity = [
     {
@@ -189,40 +187,72 @@ export function Dashboard() {
     setSelectedChallenge(challenge);
     setSubmitProofOpen(true);
     toast({
-    title: "Scroll Down",
-    description: "Scroll down to the bottom of the page to verify your submission",
-    variant: "success",
-    duration: 5000,
-    className: "max-w-[90vw] mx-4",
-  });
+      title: "Scroll Down",
+      description: "Scroll down to the bottom of the page to verify your submission",
+      variant: "success",
+      duration: 5000,
+      className: "max-w-[90vw] mx-4",
+    });
   };
 
   const handleVerificationComplete = async (result: any) => {
-    if (result.success) {
+    if (result.success && selectedChallenge) {
       try {
+        // Calculate new progress (increment by 20% for each verification)
+        const currentProgress = selectedChallenge.progress || 0;
+        const newProgress = Math.min(100, currentProgress + 20);
+        
+        // Update challenge progress in database
+        const { success: updateSuccess, error: updateError } = await updateChallengeProgress(
+          selectedChallenge.id,
+          newProgress,
+          newProgress >= 100 ? selectedChallenge.challenge?.points || 0 : 0
+        );
+
+        if (!updateSuccess) {
+          throw updateError;
+        }
+
+        // Update local state
         const updatedChallenges = activeChallenges.map((challenge) =>
           challenge.id === selectedChallenge.id
-            ? { ...challenge, progress: Math.min(100, challenge.progress + 20) }
+            ? { ...challenge, progress: newProgress }
             : challenge
         );
 
         setActiveChallenges(updatedChallenges);
 
-        if (
-          updatedChallenges.find((c) => c.id === selectedChallenge.id)
-            ?.progress === 100
-        ) {
+        if (newProgress >= 100) {
+          // Challenge completed - award badge if applicable
+          const challengeType = selectedChallenge.challenge?.challenge_type;
+          if (challengeType) {
+            // Map challenge types to badge IDs (you'll need to adjust these based on your badge IDs)
+            const badgeMap: { [key: string]: string } = {
+              'plastic-free': 'plastic-free-warrior-badge-id',
+              'bike-commute': 'green-commuter-badge-id',
+              'energy-bill': 'energy-saver-badge-id',
+              'composting': 'compost-champion-badge-id',
+              'plant-growing': 'tree-planter-badge-id',
+              'water-bill': 'water-guardian-badge-id'
+            };
+
+            const badgeId = badgeMap[challengeType];
+            if (badgeId && user?.id) {
+              await awardBadgeToUser(user.id, badgeId, selectedChallenge.challenge?.id);
+            }
+          }
+
           toast({
             title: "Challenge Completed!",
-            description: `You've earned ${selectedChallenge.points} EcoPoints! 🎉`,
+            description: `You've earned ${selectedChallenge.challenge?.points || 0} EcoPoints! 🎉`,
             variant: "success",
           });
 
           // Redirect to certificate page
           router.push(
             `/certificate?challenge=${encodeURIComponent(
-              selectedChallenge.title
-            )}&points=${selectedChallenge.points}`
+              selectedChallenge.challenge?.title || "Unknown Challenge"
+            )}&points=${selectedChallenge.challenge?.points || 0}`
           );
         } else {
           toast({
@@ -252,134 +282,101 @@ export function Dashboard() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your eco-journey...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <Card className="border-green-200 bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50">
+      <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-green-800">
-                Welcome back, {user?.name?.split(" ")[0] || "User"}! 🌱
-              </h2>
+            <div>
+              <h1 className="text-2xl font-bold text-green-800 mb-2">
+                Welcome back, {user?.name || "Eco Warrior"}! 🌱
+              </h1>
               <p className="text-green-600">
-                You're making a real difference for our planet
+                Level {userStats.level} • {userStats.levelTitle}
               </p>
-              <div className="flex items-center space-x-4">
-                <Badge className="bg-green-200 text-green-800 hover:bg-green-200">
-                  Level {userStats.level} - {userStats.levelTitle}
-                </Badge>
-                <div className="flex items-center space-x-1 text-sm text-green-600">
-                  <Users className="h-4 w-4" />
-                  <span>Rank #{userStats.rank || "N/A"} globally</span>
-                </div>
-              </div>
             </div>
-            <div className="text-right space-y-1">
-              <div className="text-4xl font-bold text-green-700">
+            <div className="text-right">
+              <div className="text-3xl font-bold text-green-600">
                 {userStats.totalPoints}
               </div>
-              <div className="text-sm text-green-600">EcoPoints</div>
-              <div className="w-32">
-                <Progress value={userStats.weeklyProgress} className="h-2" />
-                <div className="text-xs text-green-500 mt-1">
-                  Weekly Goal: {userStats.weeklyProgress}%
-                </div>
-              </div>
+              <div className="text-sm text-green-500">Total EcoPoints</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:shadow-lg transition-shadow">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-green-200 rounded-full">
-                <Zap className="h-6 w-6 text-green-700" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Zap className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-sm text-green-600 font-medium">CO₂ Saved</p>
-                <p className="text-2xl font-bold text-green-800">
+                <div className="text-2xl font-bold text-blue-800">
                   {userStats.co2Saved}kg
-                </p>
-                <div className="flex items-center space-x-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-500" />
-                  <span className="text-xs text-green-500">+12% this week</span>
                 </div>
+                <div className="text-xs text-blue-600">CO₂ Saved</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-lg transition-shadow">
+        <Card className="bg-cyan-50 border-cyan-200">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-blue-200 rounded-full">
-                <Droplets className="h-6 w-6 text-blue-700" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Droplets className="h-5 w-5 text-cyan-600" />
               <div>
-                <p className="text-sm text-blue-600 font-medium">Water Saved</p>
-                <p className="text-2xl font-bold text-blue-800">
+                <div className="text-2xl font-bold text-cyan-800">
                   {userStats.waterSaved}L
-                </p>
-                <div className="flex items-center space-x-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-blue-500" />
-                  <span className="text-xs text-blue-500">+8% this week</span>
                 </div>
+                <div className="text-xs text-cyan-600">Water Saved</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100 hover:shadow-lg transition-shadow">
+        <Card className="bg-green-50 border-green-200">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-orange-200 rounded-full">
-                <Recycle className="h-6 w-6 text-orange-700" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Recycle className="h-5 w-5 text-green-600" />
               <div>
-                <p className="text-sm text-orange-600 font-medium">
-                  Plastic Avoided
-                </p>
-                <p className="text-2xl font-bold text-orange-800">
+                <div className="text-2xl font-bold text-green-800">
                   {userStats.plasticAvoided}kg
-                </p>
-                <div className="flex items-center space-x-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-orange-500" />
-                  <span className="text-xs text-orange-500">
-                    +15% this week
-                  </span>
                 </div>
+                <div className="text-xs text-green-600">Plastic Avoided</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 hover:shadow-lg transition-shadow">
+        <Card className="bg-emerald-50 border-emerald-200">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-emerald-200 rounded-full">
-                <TreePine className="h-6 w-6 text-emerald-700" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Sprout className="h-5 w-5 text-emerald-600" />
               <div>
-                <p className="text-sm text-emerald-600 font-medium">
-                  Trees Planted
-                </p>
-                <p className="text-2xl font-bold text-emerald-800">
+                <div className="text-2xl font-bold text-emerald-800">
                   {userStats.treesPlanted}
-                </p>
-                <div className="flex items-center space-x-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-emerald-500" />
-                  <span className="text-xs text-emerald-500">+1 this week</span>
                 </div>
+                <div className="text-xs text-emerald-600">Trees Planted</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Active Challenges */}
         <div className="lg:col-span-2 space-y-4">
@@ -396,62 +393,60 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               {activeChallenges.length > 0 ? (
-                activeChallenges.map((challenge) => (
-                  <Card
-                    key={challenge.id}
-                    className="border-green-200 bg-green-50 hover:shadow-md transition-shadow"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-green-800 mb-1">
-                            {challenge.title}
-                          </h4>
-                          <p className="text-sm text-green-600 mb-2">
-                            {challenge.description}
-                          </p>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-green-700">Progress</span>
-                              <span className="font-medium text-green-800">
-                                {challenge.progress}%
-                              </span>
+                activeChallenges
+                  .filter(challenge => challenge.status === 'active')
+                  .map((challenge) => (
+                    <Card
+                      key={challenge.id}
+                      className="border-green-200 bg-green-50 hover:shadow-md transition-shadow"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-green-800 mb-1">
+                              {challenge.challenge?.title}
+                            </h4>
+                            <p className="text-sm text-green-600 mb-2">
+                              {challenge.challenge?.description}
+                            </p>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-green-700">Progress</span>
+                                <span className="font-medium text-green-800">
+                                  {challenge.progress || 0}%
+                                </span>
+                              </div>
+                              <Progress
+                                value={challenge.progress || 0}
+                                className="h-2"
+                              />
                             </div>
-                            <Progress
-                              value={challenge.progress}
-                              className="h-2"
-                            />
                           </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-200 text-green-800 ml-4"
+                          >
+                            {challenge.challenge?.points || 0} pts
+                          </Badge>
                         </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-green-200 text-green-800 ml-4"
-                        >
-                          {challenge.points} pts
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 text-sm text-green-600">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-4 w-4" />
-                            <span>{challenge.daysLeft} days left</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4 text-sm text-green-600">
+                            <div className="flex items-center space-x-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{challenge.challenge?.duration_days || 7} days left</span>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-1">
-                            <Users className="h-4 w-4" />
-                            <span>{challenge.participants} joined</span>
-                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleSubmitProof(challenge)}
+                          >
+                            Submit Proof
+                          </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                          onClick={() => handleSubmitProof(challenge)}
-                        >
-                          Submit Proof
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                      </CardContent>
+                    </Card>
+                  ))
               ) : (
                 <div className="text-center py-8">
                   <Target className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -513,12 +508,9 @@ export function Dashboard() {
                       <p className="text-xs text-gray-500">{activity.time}</p>
                     </div>
                     {activity.points > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="text-green-600 border-green-300"
-                      >
-                        +{activity.points} pts
-                      </Badge>
+                      <div className="text-sm font-semibold text-green-600">
+                        +{activity.points}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -529,96 +521,68 @@ export function Dashboard() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Badges Collection */}
+          {/* Badges */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Award className="h-5 w-5 text-yellow-600" />
+                <Trophy className="h-5 w-5 text-yellow-600" />
                 <span>Your Badges</span>
               </CardTitle>
-              <CardDescription>
-                Collect badges by completing challenges and eco-actions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                {badges.map((badge, index) => (
-                  <div
-                    key={index}
-                    className={`relative text-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                      badge.earned
-                        ? "border-yellow-300 bg-yellow-50 shadow-md hover:shadow-lg"
-                        : "border-gray-200 bg-gray-50 opacity-50 hover:opacity-75"
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{badge.icon}</div>
-                    <div className="text-xs font-medium text-gray-700 mb-1">
-                      {badge.name}
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${
-                        badge.rarity === "Legendary"
-                          ? "border-purple-300 text-purple-600"
-                          : badge.rarity === "Epic"
-                          ? "border-orange-300 text-orange-600"
-                          : badge.rarity === "Rare"
-                          ? "border-blue-300 text-blue-600"
-                          : "border-gray-300 text-gray-600"
-                      }`}
-                    >
-                      {badge.rarity}
-                    </Badge>
-                    {badge.earned && (
-                      <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-green-600 bg-white rounded-full" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Team Quick Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Team</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Team Name</span>
-                  <span className="font-medium">EcoWarriors Delhi</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Rank</span>
-                  <Badge className="bg-yellow-100 text-yellow-800">#1</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Members</span>
-                  <span className="font-medium">24</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Total Points</span>
-                  <span className="font-bold text-green-600">4,580</span>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full mt-3"
-                  onClick={() => router.push("/teams")}
-                >
-                  View Team Details
-                </Button>
+                {userBadges.length > 0 ? (
+                  userBadges.slice(0, 5).map((userBadge) => (
+                    <div
+                      key={userBadge.id}
+                      className="flex items-center space-x-3 p-2 rounded-lg bg-yellow-50 border border-yellow-200"
+                    >
+                      <div className="text-2xl">{userBadge.badge?.icon}</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-yellow-800">
+                          {userBadge.badge?.name}
+                        </p>
+                        <p className="text-xs text-yellow-600">
+                          {userBadge.badge?.rarity}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <Trophy className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No badges earned yet</p>
+                    <p className="text-xs text-gray-400">Complete challenges to earn badges!</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
+          {/* Weekly Progress */}
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                <span>Weekly Progress</span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <QuickActions />
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Eco Actions</span>
+                    <span>{userStats.weeklyProgress}%</span>
+                  </div>
+                  <Progress value={userStats.weeklyProgress} className="h-2" />
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {userStats.challengesCompleted}
+                  </div>
+                  <div className="text-sm text-gray-600">Challenges Completed</div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -636,7 +600,7 @@ export function Dashboard() {
           <div className="space-y-4 py-4">
             {selectedChallenge && (
               <AIVerification
-                challengeType={selectedChallenge.type}
+                challengeType={selectedChallenge.challenge?.challenge_type}
                 onVerificationComplete={handleVerificationComplete}
               />
             )}

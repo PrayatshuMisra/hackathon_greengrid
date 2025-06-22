@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,7 @@ import { AIVerification } from "@/components/ai/AIVerification"
 import { useApp } from "@/app/providers"
 import { useToast } from "@/hooks/use-toast"
 import { Target, Upload, UserPlus } from "lucide-react"
+import { getAvailableChallenges, enrollUserInChallenge, checkUserEnrollment } from "@/lib/supabase"
 
 export function QuickActions() {
   const [joinChallengeOpen, setJoinChallengeOpen] = useState(false)
@@ -26,26 +27,62 @@ export function QuickActions() {
   const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null)
   const [selectedChallengeType, setSelectedChallengeType] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState("")
+  const [availableChallenges, setAvailableChallenges] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
   const { supabase, user } = useApp()
   const { toast } = useToast()
   const router = useRouter()
 
-  const activeChallenges = [
-    { id: "1", title: "Plastic-Free Week Challenge", type: "plastic-free" },
-    { id: "2", title: "Bike to Work/School", type: "bike-commute" },
-    { id: "3", title: "Energy Saver Challenge", type: "energy-bill" },
-    { id: "4", title: "Home Composting", type: "composting" },
-    { id: "5", title: "Grow Your Own Herbs", type: "plant-growing" },
-  ]
+  useEffect(() => {
+    const fetchChallenges = async () => {
+      if (!user?.id) return
+
+      try {
+        const { data, error } = await getAvailableChallenges()
+        if (error) {
+          console.error("Error fetching challenges:", error)
+        } else {
+          setAvailableChallenges(data || [])
+        }
+      } catch (error) {
+        console.error("Error fetching challenges:", error)
+      }
+    }
+
+    fetchChallenges()
+  }, [user?.id])
 
   const handleJoinChallenge = async () => {
-    if (!selectedChallenge) return
+    if (!selectedChallenge || !user?.id) return
+
+    setLoading(true)
 
     try {
+      // Check if user is already enrolled
+      const { enrolled } = await checkUserEnrollment(user.id, selectedChallenge)
+      
+      if (enrolled) {
+        toast({
+          title: "Already Enrolled",
+          description: "You are already enrolled in this challenge.",
+          variant: "default",
+        })
+        setJoinChallengeOpen(false)
+        return
+      }
 
+      // Enroll user in challenge
+      const { success, error } = await enrollUserInChallenge(user.id, selectedChallenge)
+      
+      if (!success) {
+        throw error
+      }
+
+      const challenge = availableChallenges.find(c => c.id === selectedChallenge)
+      
       toast({
         title: "Thank you for joining!",
-        description: `You've successfully joined the ${activeChallenges.find((c) => c.id === selectedChallenge)?.title}`,
+        description: `You've successfully joined the ${challenge?.title || 'challenge'}`,
         variant: "success",
       })
 
@@ -57,13 +94,14 @@ export function QuickActions() {
         description: error.message || "Failed to join challenge",
         variant: "destructive",
       })
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleVerificationComplete = async (result: any) => {
     if (result.success) {
       try {
-
         toast({
           title: "Verification Successful!",
           description: "Your challenge proof has been verified.",
@@ -85,7 +123,6 @@ export function QuickActions() {
     if (!inviteEmail) return
 
     try {
-
       toast({
         title: "Invitation Sent!",
         description: `An invitation has been sent to ${inviteEmail}`,
@@ -124,7 +161,7 @@ export function QuickActions() {
                 <SelectValue placeholder="Select a challenge" />
               </SelectTrigger>
               <SelectContent>
-                {activeChallenges.map((challenge) => (
+                {availableChallenges.map((challenge) => (
                   <SelectItem key={challenge.id} value={challenge.id}>
                     {challenge.title}
                   </SelectItem>
@@ -137,10 +174,10 @@ export function QuickActions() {
               </Button>
               <Button
                 onClick={handleJoinChallenge}
-                disabled={!selectedChallenge}
+                disabled={!selectedChallenge || loading}
                 className="bg-green-600 hover:bg-green-700"
               >
-                Join Challenge
+                {loading ? "Joining..." : "Join Challenge"}
               </Button>
             </div>
           </div>
@@ -150,7 +187,7 @@ export function QuickActions() {
       {/* Submit Proof Dialog */}
       <Dialog open={submitProofOpen} onOpenChange={setSubmitProofOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="w-full" size="sm">
+          <Button className="w-full bg-blue-600 hover:bg-blue-700" size="sm">
             <Upload className="h-4 w-4 mr-2" />
             Submit Proof
           </Button>
@@ -158,30 +195,23 @@ export function QuickActions() {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Submit Challenge Proof</DialogTitle>
-            <DialogDescription>Upload proof of your eco-action for verification</DialogDescription>
+            <DialogDescription>
+              Upload proof of your eco-action for AI verification
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Select
-              onValueChange={(value) => {
-                setSelectedChallenge(value)
-                const challenge = activeChallenges.find((c) => c.id === value)
-                if (challenge) {
-                  setSelectedChallengeType(challenge.type)
-                }
-              }}
-            >
+            <Select onValueChange={(value) => setSelectedChallengeType(value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a challenge" />
+                <SelectValue placeholder="Select challenge type" />
               </SelectTrigger>
               <SelectContent>
-                {activeChallenges.map((challenge) => (
-                  <SelectItem key={challenge.id} value={challenge.id}>
-                    {challenge.title}
-                  </SelectItem>
-                ))}
+                <SelectItem value="plastic-free">Plastic-Free Challenge</SelectItem>
+                <SelectItem value="bike-commute">Bike Commute Challenge</SelectItem>
+                <SelectItem value="energy-bill">Energy Saver Challenge</SelectItem>
+                <SelectItem value="composting">Composting Challenge</SelectItem>
+                <SelectItem value="plant-growing">Plant Growing Challenge</SelectItem>
               </SelectContent>
             </Select>
-
             {selectedChallengeType && (
               <AIVerification
                 challengeType={selectedChallengeType}
@@ -195,7 +225,7 @@ export function QuickActions() {
       {/* Invite Friends Dialog */}
       <Dialog open={inviteFriendsOpen} onOpenChange={setInviteFriendsOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="w-full" size="sm">
+          <Button className="w-full bg-purple-600 hover:bg-purple-700" size="sm">
             <UserPlus className="h-4 w-4 mr-2" />
             Invite Friends
           </Button>
@@ -203,24 +233,42 @@ export function QuickActions() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Invite Friends</DialogTitle>
-            <DialogDescription>Invite friends to join GreenGrid and make a bigger impact together</DialogDescription>
+            <DialogDescription>
+              Share the eco-journey with your friends and family
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email Address</label>
+              <label htmlFor="email" className="text-sm font-medium">
+                Email Address
+              </label>
               <Input
+                id="email"
                 type="email"
                 placeholder="friend@example.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
               />
             </div>
-            <Textarea placeholder="Add a personal message (optional)" className="resize-none" />
+            <div className="space-y-2">
+              <label htmlFor="message" className="text-sm font-medium">
+                Personal Message (Optional)
+              </label>
+              <Textarea
+                id="message"
+                placeholder="Hey! Join me in making a positive impact on the environment..."
+                rows={3}
+              />
+            </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setInviteFriendsOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleInviteFriend} disabled={!inviteEmail} className="bg-green-600 hover:bg-green-700">
+              <Button
+                onClick={handleInviteFriend}
+                disabled={!inviteEmail}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
                 Send Invitation
               </Button>
             </div>

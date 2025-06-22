@@ -10,10 +10,12 @@ import { AIProvider } from "@/lib/ai-verification"
 import { ToastProvider } from "@/components/ui/toast"
 import { ThemeProvider } from "@/contexts/theme-context"
 
+const supabaseUrl = "https://lenuuxzhvadftlfbozox.supabase.co"
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlbnV1eHpodmFkZnRsZmJvem94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5NzMzNjIsImV4cCI6MjA2NTU0OTM2Mn0.YOVr0cGaVyp7APpi4QkimMFjT6DZmyBlNuZMed3STN8"
+
 const supabase = createClientComponentClient({
-  supabaseUrl: "https://lenuuxzhvadftlfbozox.supabase.co",
-  supabaseKey:
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlbnV1eHpodmFkZnRsZmJvem94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5NzMzNjIsImV4cCI6MjA2NTU0OTM2Mn0.YOVr0cGaVyp7APpi4QkimMFjT6DZmyBlNuZMed3STN8",
+  supabaseUrl,
+  supabaseKey: supabaseAnonKey
 })
 
 interface User {
