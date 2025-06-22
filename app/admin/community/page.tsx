@@ -173,7 +173,7 @@ export default function CommunityAdmin() {
               usersData = (users as User[]) || []
             }
           } catch (error) {
-            console.log("Error fetching user profiles:", error)
+            console.error("Error fetching user profiles:", JSON.stringify(error, null, 2))
           }
         }
       }
@@ -197,10 +197,29 @@ export default function CommunityAdmin() {
         }
       }
 
+      let likeCounts: Record<string, number> = {};
+      const postIds = postsData.map(post => post.id);
+      if (postIds.length > 0) {
+        const { data: likesData, error: likesError } = await supabase
+          .from("forum_likes")
+          .select("post_id")
+          .in("post_id", postIds)
+
+        if (!likesError && likesData) {
+          console.log("Likes data:", likesData);
+          // Count likes per post_id
+          likeCounts = postIds.reduce((acc, id) => {
+            acc[id] = likesData.filter((like: { post_id: string }) => like.post_id === id).length;
+            return acc;
+          }, {} as Record<string, number>);
+        }
+      }
+
       const postsWithAuthors: Post[] =
         postsData?.map((post: Post) => ({
           ...post,
           author: usersData.find((user) => user.id === post.author_id),
+          likes_count: likeCounts[post.id] || 0,
         })) || []
 
       const commentsWithAuthors: Comment[] =

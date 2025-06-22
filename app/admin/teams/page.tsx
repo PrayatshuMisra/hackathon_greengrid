@@ -56,6 +56,8 @@ async function fetchTeams() {
       .select("*")
       .order(sortField, { ascending: sortDirection === "asc" })
 
+    console.log("Fetched teams:", teamsData, teamsError);
+
     if (teamsError) throw teamsError
 
     const teamIds = teamsData.map((team) => team.id)
@@ -118,6 +120,8 @@ async function fetchTeams() {
         .update(formData)
         .eq("id", selectedTeam.id)
         .select()
+
+      console.log("Update response:", data, error);
 
       if (error) throw error
 

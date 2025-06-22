@@ -177,3 +177,26 @@ INSERT INTO events (title, description, event_type, organizer_name, start_date, 
   60
 )
 ON CONFLICT DO NOTHING;
+
+-- Seed challenge_submissions using existing user_challenges
+INSERT INTO challenge_submissions (
+  user_challenge_id,
+  user_id,
+  challenge_id,
+  submission_type,
+  file_url,
+  description,
+  verification_status,
+  submitted_at
+)
+SELECT
+  uc.id,
+  uc.user_id,
+  uc.challenge_id,
+  'image',
+  'https://example.com/proof.jpg',
+  'Demo proof submission for admin verification',
+  'pending',
+  NOW()
+FROM user_challenges uc
+LIMIT 5;
