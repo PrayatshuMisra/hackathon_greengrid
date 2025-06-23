@@ -33,6 +33,7 @@ import { DialogContent } from "@radix-ui/react-dialog";
 import { Dialog } from "@radix-ui/react-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { TypingEffect } from "@/components/ui/typing-effect";
 
 export function Dashboard() {
   const { user, supabase } = useApp();
@@ -129,7 +130,7 @@ export function Dashboard() {
 
     const fetchBadges = async () => {
       if (!user?.id) return;
-      // Fetch badges earned by the user
+
       const { data, error } = await supabase
         .from("user_badges")
         .select("*, badges(name, icon, rarity)")
@@ -143,7 +144,7 @@ export function Dashboard() {
       if (!user?.team_id) return;
       
       try {
-        // Fetch team info with dynamic member count calculation
+
         const { data: team, error: teamError } = await supabase
           .from("teams")
           .select(`
@@ -156,10 +157,10 @@ export function Dashboard() {
         if (teamError) throw teamError;
         
         if (team) {
-          // Calculate member count from team_members
+ 
           const memberCount = team.team_members?.length || 0;
           
-          // Create team info with correct member count
+ 
           const teamInfoWithCount = {
             ...team,
             member_count: memberCount
@@ -170,8 +171,7 @@ export function Dashboard() {
         }
       } catch (error) {
         console.error("Error fetching team info:", error);
-        
-        // Fallback: fetch basic team info
+  
         const { data: basicTeam, error: basicError } = await supabase
           .from("teams")
           .select("*")
@@ -216,7 +216,6 @@ export function Dashboard() {
     fetchRecentActivity();
     fetchJoined();
 
-    // Real-time subscription for user_challenges
     const channel = supabase
       .channel('user_challenges_changes')
       .on(
@@ -226,7 +225,6 @@ export function Dashboard() {
       )
       .subscribe();
 
-    // Real-time subscription for user_activity
     const activityChannel = supabase
       .channel('user_activity_changes')
       .on(
@@ -236,7 +234,7 @@ export function Dashboard() {
       )
       .subscribe();
 
-    // Real-time subscription for team_members (to update team info when members change)
+   
     const teamMembersChannel = supabase
       .channel('team_members_changes')
       .on(
@@ -289,9 +287,7 @@ export function Dashboard() {
         const challengePoints = selectedChallenge.challenges?.points || 0;
 
         if (newProgress >= 100) {
-          // --- CHALLENGE COMPLETED ---
-          
-          // 1. Final update to user_challenges
+
           await supabase
             .from("user_challenges")
             .update({
@@ -302,7 +298,6 @@ export function Dashboard() {
             })
             .eq("id", selectedChallenge.id);
 
-          // 2. Call DB function to update user and team points
           if (user?.id && challengePoints > 0) {
             const { error: pointsError } = await supabase.rpc(
               "update_user_points",
@@ -314,7 +309,6 @@ export function Dashboard() {
             if (pointsError) throw pointsError;
           }
 
-          // 3. Log completion activity
           if (user?.id) {
             await supabase.from("user_activity").insert({
               user_id: user.id,
@@ -326,7 +320,6 @@ export function Dashboard() {
             });
           }
 
-          // 4. Show toast and redirect
           toast({
             title: "Challenge Completed!",
             description: `You've earned ${challengePoints} EcoPoints! 🎉`,
@@ -340,9 +333,7 @@ export function Dashboard() {
           );
 
         } else {
-          // --- CHALLENGE IN PROGRESS ---
 
-          // 1. Update progress in user_challenges
           const { data, error } = await supabase
             .from("user_challenges")
             .update({ progress: newProgress })
@@ -351,8 +342,7 @@ export function Dashboard() {
             .single();
 
           if (error) throw error;
-          
-          // 2. Update local state for active challenges
+
           if (data) {
             setActiveChallenges((prev) =>
               prev.map((challenge) =>
@@ -362,8 +352,7 @@ export function Dashboard() {
               )
             );
           }
-          
-          // 3. Log progress activity
+
           if (user?.id) {
             await supabase.from("user_activity").insert({
               user_id: user.id,
@@ -374,7 +363,6 @@ export function Dashboard() {
             });
           }
 
-          // 4. Show progress toast
           toast({
             title: "Verification Successful!",
             description: "Your challenge proof has been verified and your progress has been updated.",
@@ -410,10 +398,13 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-green-800">
-                Welcome back, {user?.name?.split(" ")[0] || "User"}! 🌱
+                <TypingEffect text={`Welcome back, ${user?.name || "User"}! 🌱`} />
               </h2>
               <p className="text-green-600">
                 You're making a real difference for our planet
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                Your account has been created! To access challenges and your profile, please complete your profile on the <span className="font-semibold text-green-700">Teams</span> page.
               </p>
               <div className="flex items-center space-x-4">
                 <Badge className="bg-green-200 text-green-800 hover:bg-green-200">
