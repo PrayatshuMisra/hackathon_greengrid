@@ -404,7 +404,7 @@ export function Dashboard() {
                 You're making a real difference for our planet
               </p>
               <p className="mt-2 text-sm text-gray-600">
-                Your account has been created! To access challenges and your profile, please complete your profile on the <span className="font-semibold text-green-700">Teams</span> page.
+                Your account has been created! To access challenges and your profile, please create your profile on the <span className="font-semibold text-green-700">Teams</span> page.
               </p>
               <div className="flex items-center space-x-4">
                 <Badge className="bg-green-200 text-green-800 hover:bg-green-200">
